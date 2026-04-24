@@ -28,6 +28,7 @@ const API_CONFIG = {
             SIGNUP: '/auth/signup',
             LOGOUT: '/auth/logout',
             SEND_SIGNUP_EMAIL_OTP: '/auth/signup/send-email-otp',
+            SEND_SIGNUP_MAGIC_LINK: '/auth/signup/send-email-otp',
             SIGNUP_EMAIL_VERIFICATION_STATUS: '/auth/signup/email-verification-status',
             VERIFY_SIGNUP_EMAIL_OTP: '/auth/signup/verify-email-otp',
             VERIFY_SIGNUP_EMAIL_LINK: '/auth/signup/verify-email-link',

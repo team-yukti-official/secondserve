@@ -220,16 +220,16 @@ const sendSignupEmailOtp = async (req, res) => {
         if (otpErr) {
             if (/rate limit/i.test(otpErr.message || '')) {
                 return res.status(429).json({
-                    error: 'Too many OTP requests. Please wait a minute and try again.',
+                    error: 'Too many magic link requests. Please wait a minute and try again.',
                     details: otpErr.message
                 });
             }
-            return res.status(400).json({ error: 'Failed to send email OTP', details: otpErr.message });
+            return res.status(400).json({ error: 'Failed to send magic link', details: otpErr.message });
         }
 
-        return res.json({ message: 'Email OTP sent' });
+        return res.json({ message: 'Magic link sent' });
     } catch (error) {
-        return res.status(500).json({ error: 'Send email OTP error', details: error.message });
+        return res.status(500).json({ error: 'Send magic link error', details: error.message });
     }
 };
 

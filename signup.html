@@ -179,40 +179,28 @@
                  EMAIL SECTION
                  ═══════════════════════════════════════════════════════════ -->
             <div class="form-group">
-
-                <!-- Row 1 : email input + Send OTP button -->
                 <div class="field-row" id="emailInputRow">
                     <input type="email" id="email" placeholder="Email Address"
                            required autocomplete="email">
-                    <button type="button" class="send-otp-btn" id="sendEmailOtpBtn">
+                    <button type="button" class="send-magic-link-btn" id="sendMagicLinkBtn">
                         <i class="fas fa-paper-plane"></i>
-                        <span>Send OTP</span>
+                        <span>Send Magic Link</span>
                     </button>
                 </div>
 
-                <!-- Row 2 : OTP entry — hidden until OTP is sent -->
-                <div class="otp-section" id="emailOtpSection">
-                    <div class="otp-section-header">
-                        <i class="fas fa-shield-alt"></i>
-                        <span>Enter the OTP sent to your email</span>
+                <div class="magic-link-section" id="magicLinkSection">
+                    <div class="magic-link-section-header">
+                        <i class="fas fa-envelope-open-text"></i>
+                        <span>Check your inbox for a secure link</span>
                     </div>
-                    <div class="otp-boxes-row">
-                        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" autocomplete="off">
-                        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" autocomplete="off">
-                        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" autocomplete="off">
-                        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" autocomplete="off">
-                        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" autocomplete="off">
-                        <input class="otp-box" type="text" maxlength="1" inputmode="numeric" autocomplete="off">
+                    <p class="magic-link-copy">
+                        We'll send a one-time sign-in link to verify this email address.
+                    </p>
+                    <div class="magic-link-footer">
+                        <span class="magic-link-status" id="magicLinkStatus"></span>
+                        <small class="magic-link-note" id="magicLinkNote"></small>
                     </div>
-                    <div class="otp-section-footer">
-                        <span class="otp-status" id="emailOtpStatus"></span>
-                        <button type="button" class="verify-otp-btn" id="verifyEmailOtpBtn">
-                            <i class="fas fa-check-circle"></i> Verify Email
-                        </button>
-                    </div>
-                    <small class="resend-text" id="emailResend"></small>
                 </div>
-
             </div>
 
             <!-- Password -->

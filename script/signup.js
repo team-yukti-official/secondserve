@@ -22,13 +22,17 @@ document.addEventListener('DOMContentLoaded', function () {
     const longitudeInput        = document.getElementById('longitude');
     const locationStatus        = document.getElementById('locationStatus');
 
-    /* OTP UI refs */
-    const sendEmailOtpBtn    = document.getElementById('sendEmailOtpBtn');
-    const emailOtpSection    = document.getElementById('emailOtpSection');
-    const emailOtpBoxes      = emailOtpSection.querySelectorAll('.otp-box');
-    const verifyEmailOtpBtn  = document.getElementById('verifyEmailOtpBtn');
-    const emailOtpStatus     = document.getElementById('emailOtpStatus');
-    const emailResend        = document.getElementById('emailResend');
+    /* Magic link UI refs */
+    const sendMagicLinkBtn   = document.getElementById('sendMagicLinkBtn');
+    const magicLinkSection   = document.getElementById('magicLinkSection');
+    const magicLinkStatus    = document.getElementById('magicLinkStatus');
+    const magicLinkNote      = document.getElementById('magicLinkNote');
+    const sendEmailOtpBtn    = sendMagicLinkBtn;
+    const emailOtpSection    = magicLinkSection;
+    const emailOtpBoxes      = [];
+    const verifyEmailOtpBtn  = { disabled: false, addEventListener() {}, classList: { add() {}, remove() {} } };
+    const emailOtpStatus     = magicLinkStatus;
+    const emailResend        = magicLinkNote;
 
     /* Country code refs */
     const countryCodeBtn     = document.getElementById('countryCodeBtn');
@@ -346,8 +350,9 @@ document.addEventListener('DOMContentLoaded', function () {
        OTP HELPERS
        ================================================================ */
     function setStatus(el, msg, type) {
+        if (!el) return;
         el.textContent = msg;
-        el.className = 'otp-status' + (type ? ' ' + type : '');
+        el.className = 'magic-link-status' + (type ? ' ' + type : '');
     }
 
     async function loadEmailVerificationStatus() {
@@ -361,14 +366,20 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!emailVerificationRequired) {
                 emailVerified = true;
                 emailVerificationToken = '';
-                sendEmailOtpBtn.disabled = true;
-                verifyEmailOtpBtn.disabled = true;
-                emailOtpSection.classList.add('visible', 'verified');
+                if (sendMagicLinkBtn) {
+                    sendMagicLinkBtn.disabled = true;
+                }
+                if (magicLinkSection) {
+                    magicLinkSection.classList.add('visible', 'verified');
+                }
                 setStatus(
-                    emailOtpStatus,
+                    magicLinkStatus,
                     `Email verification temporarily paused${response?.data?.resumeAt ? ` until ${new Date(response.data.resumeAt).toLocaleTimeString()}` : ''}.`,
                     'success'
                 );
+                if (magicLinkNote) {
+                    magicLinkNote.textContent = 'You can continue without opening a magic link.';
+                }
             }
         } catch (error) {
             emailVerificationRequired = true;
@@ -377,25 +388,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function startResendTimer(sendBtn, resendEl, existingInterval, callback) {
         let secs = 60;
-        resendEl.innerHTML = `Resend OTP in <strong>${secs}s</strong>`;
+        if (resendEl) {
+            resendEl.innerHTML = `Resend link in <strong>${secs}s</strong>`;
+        }
         if (existingInterval) clearInterval(existingInterval);
 
         const t = setInterval(() => {
             secs--;
             if (secs <= 0) {
                 clearInterval(t);
-                resendEl.innerHTML = `Didn't receive it? <a id="resendLink">Resend OTP</a>`;
-                sendBtn.disabled = false;
+                if (resendEl) {
+                    resendEl.innerHTML = `Didn't receive it? <a id="resendLink">Resend link</a>`;
+                }
+                if (sendBtn) {
+                    sendBtn.disabled = false;
+                }
                 document.getElementById('resendLink')?.addEventListener('click', callback);
             } else {
-                resendEl.innerHTML = `Resend OTP in <strong>${secs}s</strong>`;
+                if (resendEl) {
+                    resendEl.innerHTML = `Resend link in <strong>${secs}s</strong>`;
+                }
             }
         }, 1000);
         return t;
     }
 
     /* ================================================================
-       EMAIL OTP
+       MAGIC LINK
        ================================================================ */
     async function sendEmailOtp() {
         if (!emailVerificationRequired) {
@@ -412,18 +431,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
         try {
             const response = await APIUtils.post(
-                API_CONFIG.ENDPOINTS.AUTH.SEND_SIGNUP_EMAIL_OTP,
+                API_CONFIG.ENDPOINTS.AUTH.SEND_SIGNUP_MAGIC_LINK,
                 { email: emailInput.value.trim(), redirectTo: `${window.location.origin}/signup.html` },
                 { includeAuth: false }
             );
 
             if (response?.data?.devOtp) {
-                console.info('[DEV] Email OTP:', response.data.devOtp);
+                console.info('[DEV] Magic link code:', response.data.devOtp);
             }
         } catch (error) {
-            setStatus(emailOtpStatus, `✗ ${error.message || 'Failed to send OTP'}`, 'error');
+            setStatus(emailOtpStatus, `✗ ${error.message || 'Failed to send magic link'}`, 'error');
             sendEmailOtpBtn.disabled = false;
-            sendEmailOtpBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send OTP</span>';
+            sendEmailOtpBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Magic Link</span>';
             return;
         }
 
@@ -435,15 +454,15 @@ document.addEventListener('DOMContentLoaded', function () {
         emailInput.classList.remove('verified');
 
         sendEmailOtpBtn.disabled = true;
-        sendEmailOtpBtn.innerHTML = '<i class="fas fa-check"></i><span>OTP Sent</span>';
+        sendEmailOtpBtn.innerHTML = '<i class="fas fa-check"></i><span>Link Sent</span>';
         sendEmailOtpBtn.classList.add('sent');
 
         setStatus(emailOtpStatus, '', '');
-        emailOtpBoxes[0].focus();
+        emailOtpBoxes[0]?.focus?.();
 
         emailResendInterval = startResendTimer(sendEmailOtpBtn, emailResend, emailResendInterval, () => {
             sendEmailOtpBtn.classList.remove('sent');
-            sendEmailOtpBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send OTP</span>';
+            sendEmailOtpBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Magic Link</span>';
             emailResend.innerHTML = '';
             sendEmailOtp();
         });
@@ -460,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function () {
         verifyEmailOtpBtn.disabled = true;
         try {
             const response = await APIUtils.post(
-                API_CONFIG.ENDPOINTS.AUTH.VERIFY_SIGNUP_EMAIL_OTP,
+                API_CONFIG.ENDPOINTS.AUTH.VERIFY_SIGNUP_EMAIL_LINK,
                 { email: emailInput.value.trim(), otp: entered },
                 { includeAuth: false }
             );
@@ -477,13 +496,13 @@ document.addEventListener('DOMContentLoaded', function () {
             verifyEmailOtpBtn.disabled = true;
             clearInterval(emailResendInterval);
             emailResend.innerHTML = '';
-            setStatus(emailOtpStatus, '✓ Email verified successfully!', 'success');
+            setStatus(emailOtpStatus, '✓ Magic link verified successfully!', 'success');
         } catch (error) {
             verifyEmailOtpBtn.disabled = false;
-            setStatus(emailOtpStatus, '✗ Incorrect OTP. Try again.', 'error');
+            setStatus(emailOtpStatus, '✗ Magic link verification failed. Try again.', 'error');
             shakeOtpBoxes(emailOtpBoxes);
             clearOtpBoxes(emailOtpBoxes);
-            emailOtpBoxes[0].focus();
+            emailOtpBoxes[0]?.focus?.();
         }
     }
 
@@ -528,14 +547,25 @@ document.addEventListener('DOMContentLoaded', function () {
             emailInput.classList.add('verified');
             emailInput.readOnly = true;
             emailOtpSection.classList.add('visible', 'verified');
+            if (sendMagicLinkBtn) {
+                sendMagicLinkBtn.disabled = true;
+                sendMagicLinkBtn.classList.add('sent');
+                sendMagicLinkBtn.innerHTML = '<i class="fas fa-check"></i><span>Link Verified</span>';
+            }
             verifyEmailOtpBtn.disabled = true;
-            setStatus(emailOtpStatus, '✓ Email verified from link.', 'success');
+            setStatus(emailOtpStatus, '✓ Magic link verified successfully!', 'success');
+            if (emailResend) {
+                emailResend.innerHTML = '';
+            }
+            if (emailResendInterval) {
+                clearInterval(emailResendInterval);
+            }
 
             // Clean token params from URL after verification.
             const clean = `${window.location.origin}${window.location.pathname}`;
             window.history.replaceState({}, document.title, clean);
         } catch (error) {
-            // Keep manual OTP path available if link verification fails.
+            // Keep the manual magic-link path available if verification fails.
         }
     }
 
@@ -545,6 +575,11 @@ document.addEventListener('DOMContentLoaded', function () {
         emailVerified = false;
         emailVerificationToken = '';
         emailInput.readOnly = false;
+        if (sendMagicLinkBtn) {
+            sendMagicLinkBtn.disabled = false;
+            sendMagicLinkBtn.classList.remove('sent');
+            sendMagicLinkBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Magic Link</span>';
+        }
         verifyEmailOtpBtn.disabled = false;
         emailOtpSection.classList.remove('verified');
     });
@@ -660,7 +695,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (useLocationBtn) useLocationBtn.addEventListener('click', handleUseLocation);
 
     /* ================================================================
-       FORM SUBMIT  (original logic + email OTP gate)
+       FORM SUBMIT  (original logic + magic-link gate)
        ================================================================ */
     if (signupForm) {
         signupForm.addEventListener('submit', async function (e) {
@@ -683,7 +718,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if (userData.userType === 'donor' && !userData.donorType)   { APIUtils.showErrorMessage('Please select your donor type'); return; }
             if (!userData.fullName)                                      { APIUtils.showErrorMessage('Please enter your full name'); return; }
             if (!userData.email || !validateEmail(userData.email))       { APIUtils.showErrorMessage('Please enter a valid email address'); return; }
-            if (!OTP_VERIFICATION_DISABLED && emailVerificationRequired && !emailVerified)              { APIUtils.showErrorMessage('Please verify your email with OTP first.'); sendEmailOtpBtn.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
+            if (emailVerificationRequired && !emailVerified)              { APIUtils.showErrorMessage('Please verify your email with the magic link first.'); sendMagicLinkBtn.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
             if (!userData.password || userData.password.length < 8)     { APIUtils.showErrorMessage('Password must be at least 8 characters'); return; }
             if (userData.password !== userData.confirmPassword)          { APIUtils.showErrorMessage('Passwords do not match!'); confirmPasswordInput.focus(); return; }
             if (!userData.city)                                          { APIUtils.showErrorMessage('Please enter your city'); return; }
