@@ -28,6 +28,7 @@
     const magicLinkSection   = document.getElementById('magicLinkSection');
     const magicLinkStatus    = document.getElementById('magicLinkStatus');
     const magicLinkNote      = document.getElementById('magicLinkNote');
+    const magicLinkResend    = document.getElementById('magicLinkResend');
 
     /* Country code refs */
     const countryCodeBtn     = document.getElementById('countryCodeBtn');
@@ -411,6 +412,9 @@
         if (magicLinkNote) {
             magicLinkNote.textContent = 'Verified and synced across devices.';
         }
+        if (magicLinkResend) {
+            magicLinkResend.textContent = '';
+        }
 
         if (emailResendInterval) {
             clearInterval(emailResendInterval);
@@ -446,8 +450,6 @@
                     data.verificationToken,
                     'Email verified on another device!'
                 );
-            } else if (data.pending && magicLinkNote) {
-                magicLinkNote.textContent = 'Waiting for you to tap the link on another device...';
             }
         } catch (error) {
             // Temporary network glitches should not break the polling flow.
@@ -518,11 +520,11 @@
 
         setStatus(magicLinkStatus, 'Magic link sent. Check your inbox.', 'success');
         if (magicLinkNote) {
-            magicLinkNote.textContent = 'Waiting for you to tap the link on another device...';
+            magicLinkNote.textContent = 'Waiting for you to tap the link on another device.';
         }
 
         startVerificationPolling(email);
-        emailResendInterval = startResendTimer(sendMagicLinkBtn, magicLinkNote, emailResendInterval, handleMagicLinkSend);
+        emailResendInterval = startResendTimer(sendMagicLinkBtn, magicLinkResend, emailResendInterval, handleMagicLinkSend);
     }
 
     async function tryVerifyEmailFromMagicLink() {
@@ -601,6 +603,9 @@
         if (magicLinkNote) {
             magicLinkNote.textContent = 'The page will update automatically when you open the link on any device.';
         }
+        if (magicLinkResend) {
+            magicLinkResend.textContent = '';
+        }
         setStatus(magicLinkStatus, '', '');
         queueVerificationPolling(emailInput.value);
     });
@@ -643,14 +648,14 @@
                 confirmPasswordInput.style.boxShadow  = '0 0 5px rgba(244,67,54,0.3)';
                 const e = document.createElement('small');
                 e.className = 'error-message';
-                e.textContent = 'âœ— Passwords do not match';
+                e.textContent = 'X not matched';
                 confirmPasswordInput.parentElement.appendChild(e);
             } else {
                 confirmPasswordInput.style.borderColor = '#4caf50';
                 confirmPasswordInput.style.boxShadow  = '0 0 5px rgba(76,175,80,0.3)';
                 const s = document.createElement('small');
                 s.className = 'success-message';
-                s.textContent = 'âœ“ Passwords match';
+                s.textContent = '✓ matched';
                 confirmPasswordInput.parentElement.appendChild(s);
             }
         } else {
@@ -747,7 +752,7 @@
             if (!userData.email || !validateEmail(userData.email))       { APIUtils.showErrorMessage('Please enter a valid email address'); return; }
             if (emailVerificationRequired && !emailVerified)              { APIUtils.showErrorMessage('Please verify your email with the magic link first.'); sendMagicLinkBtn.scrollIntoView({ behavior:'smooth', block:'center' }); return; }
             if (!userData.password || userData.password.length < 8)     { APIUtils.showErrorMessage('Password must be at least 8 characters'); return; }
-            if (userData.password !== userData.confirmPassword)          { APIUtils.showErrorMessage('Passwords do not match!'); confirmPasswordInput.focus(); return; }
+            if (userData.password !== userData.confirmPassword)          { APIUtils.showErrorMessage('X not matched'); confirmPasswordInput.focus(); return; }
             if (!userData.city)                                          { APIUtils.showErrorMessage('Please enter your city'); return; }
 
             const originalText = submitBtn.innerHTML;
