@@ -7,6 +7,7 @@ const OTP_VERIFICATION_DISABLED = true;
 const otpStore = new Map();
 const resetTokenStore = new Map();
 const signupEmailVerificationStore = new Map();
+const SIGNUP_VERIFICATION_TABLE = 'signup_email_verifications';
 
 function generateOtp() {
     return String(Math.floor(100000 + Math.random() * 900000));
@@ -14,6 +15,128 @@ function generateOtp() {
 
 function generateVerificationToken() {
     return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function normalizeEmail(email) {
+    return String(email || '').trim().toLowerCase();
+}
+
+function createSignupVerificationRecord(overrides = {}) {
+    const now = Date.now();
+    return {
+        status: 'pending',
+        sentAt: now,
+        expiresAt: now + 20 * 60 * 1000,
+        verificationToken: '',
+        verifiedAt: null,
+        ...overrides
+    };
+}
+
+function normalizeSignupVerificationRecord(record, emailFallback = '') {
+    if (!record) return null;
+
+    const sentAt = record.sentAt ?? (record.sent_at ? Date.parse(record.sent_at) : null);
+    const expiresAt = record.expiresAt ?? (record.expires_at ? Date.parse(record.expires_at) : null);
+    const verifiedAt = record.verifiedAt ?? (record.verified_at ? Date.parse(record.verified_at) : null);
+
+    return {
+        email: normalizeEmail(record.email || emailFallback),
+        status: record.status || 'pending',
+        sentAt: Number.isFinite(sentAt) ? sentAt : null,
+        expiresAt: Number.isFinite(expiresAt) ? expiresAt : null,
+        verificationToken: record.verificationToken || record.verification_token || '',
+        verifiedAt: Number.isFinite(verifiedAt) ? verifiedAt : null
+    };
+}
+
+async function getSignupVerificationRecord(email) {
+    const key = normalizeEmail(email);
+    if (!key) return null;
+
+    try {
+        const { data, error } = await supabaseAdmin
+            .from(SIGNUP_VERIFICATION_TABLE)
+            .select('*')
+            .eq('email', key)
+            .maybeSingle();
+
+        if (error) {
+            throw error;
+        }
+
+        const record = normalizeSignupVerificationRecord(data, key);
+        if (!record) return null;
+
+        if (record.expiresAt && Date.now() > record.expiresAt) {
+            await deleteSignupVerificationRecord(key);
+            return null;
+        }
+
+        return record;
+    } catch (error) {
+        const record = normalizeSignupVerificationRecord(signupEmailVerificationStore.get(key), key);
+        if (!record) return null;
+
+        if (record.expiresAt && Date.now() > record.expiresAt) {
+            signupEmailVerificationStore.delete(key);
+            return null;
+        }
+
+        return record;
+    }
+}
+
+async function setSignupVerificationRecord(email, updates = {}) {
+    const key = normalizeEmail(email);
+    if (!key) return null;
+
+    const existing = (await getSignupVerificationRecord(key)) || {};
+    const record = normalizeSignupVerificationRecord({
+        ...existing,
+        ...updates,
+        email: key
+    }, key);
+
+    try {
+        const payload = {
+            email: key,
+            status: record.status,
+            sent_at: record.sentAt ? new Date(record.sentAt).toISOString() : new Date().toISOString(),
+            expires_at: record.expiresAt ? new Date(record.expiresAt).toISOString() : new Date(Date.now() + 20 * 60 * 1000).toISOString(),
+            verification_token: record.verificationToken || '',
+            verified_at: record.verifiedAt ? new Date(record.verifiedAt).toISOString() : null,
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await supabaseAdmin
+            .from(SIGNUP_VERIFICATION_TABLE)
+            .upsert(payload, { onConflict: 'email' });
+
+        if (error) {
+            throw error;
+        }
+    } catch (error) {
+        signupEmailVerificationStore.set(key, record);
+    }
+
+    return record;
+}
+
+async function deleteSignupVerificationRecord(email) {
+    const key = normalizeEmail(email);
+    if (!key) return;
+
+    try {
+        await supabaseAdmin
+            .from(SIGNUP_VERIFICATION_TABLE)
+            .delete()
+            .eq('email', key);
+    } catch (error) {
+        // Fall back to in-memory cleanup below.
+    }
+
+    signupEmailVerificationStore.delete(key);
 }
 
 function getEmailVerificationPauseUntil() {
@@ -44,14 +167,14 @@ const signup = async (req, res) => {
 
         const normalizedAddress = (address || city || '').trim();
 
-        const emailKey = (email || '').toLowerCase();
+        const emailKey = normalizeEmail(email);
 
-        const emailVerification = signupEmailVerificationStore.get(emailKey);
+        const emailVerification = await getSignupVerificationRecord(emailKey);
 
         if (!OTP_VERIFICATION_DISABLED && !isEmailVerificationPaused()) {
             if (
                 !emailVerification ||
-                emailVerification.token !== emailVerificationToken ||
+                emailVerification.verificationToken !== emailVerificationToken ||
                 Date.now() > emailVerification.expiresAt
             ) {
                 return res.status(400).json({ error: 'Email verification required or expired.' });
@@ -158,7 +281,7 @@ const signup = async (req, res) => {
             });
         }
 
-        signupEmailVerificationStore.delete(emailKey);
+        await deleteSignupVerificationRecord(emailKey);
 
         res.status(201).json({
             message: 'Signup successful',
@@ -175,6 +298,7 @@ const sendSignupEmailOtp = async (req, res) => {
     try {
         const email = (req.body.email || '').trim().toLowerCase();
         const redirectTo = String(req.body.redirectTo || '').trim();
+        const fallbackRedirectTo = 'https://secondserve.in/signup.html';
 
         if (isEmailVerificationPaused()) {
             return res.status(503).json({
@@ -198,9 +322,7 @@ const sendSignupEmailOtp = async (req, res) => {
 
         const otpOptions = { shouldCreateUser: true };
         const hasRedirect = /^https?:\/\//i.test(redirectTo);
-        if (hasRedirect) {
-            otpOptions.emailRedirectTo = redirectTo;
-        }
+        otpOptions.emailRedirectTo = hasRedirect ? redirectTo : fallbackRedirectTo;
 
         let { error: otpErr } = await supabase.auth.signInWithOtp({
             email,
@@ -212,7 +334,10 @@ const sendSignupEmailOtp = async (req, res) => {
         if (otpErr && hasRedirect) {
             const retry = await supabase.auth.signInWithOtp({
                 email,
-                options: { shouldCreateUser: true }
+                options: {
+                    shouldCreateUser: true,
+                    emailRedirectTo: fallbackRedirectTo
+                }
             });
             otpErr = retry.error;
         }
@@ -226,6 +351,11 @@ const sendSignupEmailOtp = async (req, res) => {
             }
             return res.status(400).json({ error: 'Failed to send magic link', details: otpErr.message });
         }
+
+        await setSignupVerificationRecord(email, createSignupVerificationRecord({
+            status: 'pending',
+            verificationToken: ''
+        }));
 
         return res.json({ message: 'Magic link sent' });
     } catch (error) {
@@ -248,7 +378,12 @@ const verifySignupEmailOtp = async (req, res) => {
         if (OTP_VERIFICATION_DISABLED) {
             // Skip verification and directly generate token
             const verificationToken = generateVerificationToken();
-            signupEmailVerificationStore.set(email, { token: verificationToken, expiresAt: Date.now() + 20 * 60 * 1000 });
+            await setSignupVerificationRecord(email, {
+                status: 'verified',
+                verificationToken,
+                verifiedAt: Date.now(),
+                expiresAt: Date.now() + 20 * 60 * 1000
+            });
             return res.json({ message: 'Email verified (OTP disabled)', verificationToken });
         }
 
@@ -263,7 +398,12 @@ const verifySignupEmailOtp = async (req, res) => {
         }
 
         const verificationToken = generateVerificationToken();
-        signupEmailVerificationStore.set(email, { token: verificationToken, expiresAt: Date.now() + 20 * 60 * 1000 });
+        await setSignupVerificationRecord(email, {
+            status: 'verified',
+            verificationToken,
+            verifiedAt: Date.now(),
+            expiresAt: Date.now() + 20 * 60 * 1000
+        });
 
         return res.json({ message: 'Email verified', verificationToken });
     } catch (error) {
@@ -300,7 +440,12 @@ const verifySignupEmailLink = async (req, res) => {
 
         const email = data.user.email.toLowerCase();
         const verificationToken = generateVerificationToken();
-        signupEmailVerificationStore.set(email, { token: verificationToken, expiresAt: Date.now() + 20 * 60 * 1000 });
+        await setSignupVerificationRecord(email, {
+            status: 'verified',
+            verificationToken,
+            verifiedAt: Date.now(),
+            expiresAt: Date.now() + 20 * 60 * 1000
+        });
 
         return res.json({ message: 'Email verified', email, verificationToken });
     } catch (error) {
@@ -329,7 +474,12 @@ const verifySignupEmailSession = async (req, res) => {
 
         const email = data.user.email.toLowerCase();
         const verificationToken = generateVerificationToken();
-        signupEmailVerificationStore.set(email, { token: verificationToken, expiresAt: Date.now() + 20 * 60 * 1000 });
+        await setSignupVerificationRecord(email, {
+            status: 'verified',
+            verificationToken,
+            verifiedAt: Date.now(),
+            expiresAt: Date.now() + 20 * 60 * 1000
+        });
 
         return res.json({ message: 'Email verified', email, verificationToken });
     } catch (error) {
@@ -521,12 +671,23 @@ const verifyEmail = async (req, res) => {
     });
 };
 
-const getSignupEmailVerificationStatus = (req, res) => {
+const getSignupEmailVerificationStatus = async (req, res) => {
     const paused = isEmailVerificationPaused();
+    const email = String(req.query.email || '').trim().toLowerCase();
+    let record = email ? await getSignupVerificationRecord(email) : null;
+    const verified = !!record && record.status === 'verified' && !!record.verificationToken;
+
     return res.json({
         required: !paused,
         paused,
-        resumeAt: paused ? new Date(getEmailVerificationPauseUntil()).toISOString() : null
+        resumeAt: paused ? new Date(getEmailVerificationPauseUntil()).toISOString() : null,
+        email: email || null,
+        pending: !!record && record.status === 'pending',
+        verified,
+        verificationToken: verified ? record.verificationToken : null,
+        sentAt: record?.sentAt ? new Date(record.sentAt).toISOString() : null,
+        verifiedAt: record?.verifiedAt ? new Date(record.verifiedAt).toISOString() : null,
+        expiresAt: record?.expiresAt ? new Date(record.expiresAt).toISOString() : null
     });
 };
 

@@ -15,6 +15,21 @@ CREATE TABLE users (
     updated_at TIMESTAMP DEFAULT now()
 );
 
+-- Signup email verification state for cross-device magic-link syncing
+CREATE TABLE signup_email_verifications (
+    email VARCHAR(255) PRIMARY KEY,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'verified', 'expired')),
+    sent_at TIMESTAMP DEFAULT now(),
+    expires_at TIMESTAMP NOT NULL,
+    verification_token TEXT DEFAULT '',
+    verified_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT now(),
+    updated_at TIMESTAMP DEFAULT now()
+);
+
+CREATE INDEX idx_signup_email_verifications_status ON signup_email_verifications(status);
+CREATE INDEX idx_signup_email_verifications_expires_at ON signup_email_verifications(expires_at);
+
 -- Donations table
 CREATE TABLE donations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

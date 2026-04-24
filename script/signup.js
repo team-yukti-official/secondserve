@@ -1,9 +1,10 @@
-document.addEventListener('DOMContentLoaded', function () {
+﻿document.addEventListener('DOMContentLoaded', function () {
+    const MAGIC_LINK_REDIRECT_URL = 'https://secondserve.in/signup.html';
 
-    /* ── Temporary flag to disable OTP verification ────────────────────── */
+    /* â”€â”€ Temporary flag to disable OTP verification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     const OTP_VERIFICATION_DISABLED = true;
 
-    /* ── DOM refs ───────────────────────────────────────────────────────── */
+    /* â”€â”€ DOM refs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     const passwordInput         = document.getElementById('password');
     const confirmPasswordInput  = document.getElementById('confirmPassword');
     const passwordToggle        = document.getElementById('passwordToggle');
@@ -27,12 +28,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const magicLinkSection   = document.getElementById('magicLinkSection');
     const magicLinkStatus    = document.getElementById('magicLinkStatus');
     const magicLinkNote      = document.getElementById('magicLinkNote');
-    const sendEmailOtpBtn    = sendMagicLinkBtn;
-    const emailOtpSection    = magicLinkSection;
-    const emailOtpBoxes      = [];
-    const verifyEmailOtpBtn  = { disabled: false, addEventListener() {}, classList: { add() {}, remove() {} } };
-    const emailOtpStatus     = magicLinkStatus;
-    const emailResend        = magicLinkNote;
 
     /* Country code refs */
     const countryCodeBtn     = document.getElementById('countryCodeBtn');
@@ -48,110 +43,113 @@ document.addEventListener('DOMContentLoaded', function () {
     let emailVerificationRequired = true;
     let emailVerificationToken = '';
     let emailResendInterval = null;
+    let emailVerificationPollInterval = null;
+    let emailVerificationSyncTimeout = null;
+    let pendingVerificationEmail = '';
 
     /* ================================================================
        COUNTRY LIST
        ================================================================ */
     const COUNTRIES = [
-        { flag:'🇦🇫', name:'Afghanistan',           code:'+93'  },
-        { flag:'🇦🇱', name:'Albania',               code:'+355' },
-        { flag:'🇩🇿', name:'Algeria',               code:'+213' },
-        { flag:'🇦🇷', name:'Argentina',             code:'+54'  },
-        { flag:'🇦🇲', name:'Armenia',               code:'+374' },
-        { flag:'🇦🇺', name:'Australia',             code:'+61'  },
-        { flag:'🇦🇹', name:'Austria',               code:'+43'  },
-        { flag:'🇦🇿', name:'Azerbaijan',            code:'+994' },
-        { flag:'🇧🇭', name:'Bahrain',               code:'+973' },
-        { flag:'🇧🇩', name:'Bangladesh',            code:'+880' },
-        { flag:'🇧🇾', name:'Belarus',               code:'+375' },
-        { flag:'🇧🇪', name:'Belgium',               code:'+32'  },
-        { flag:'🇧🇷', name:'Brazil',                code:'+55'  },
-        { flag:'🇧🇳', name:'Brunei',                code:'+673' },
-        { flag:'🇧🇬', name:'Bulgaria',              code:'+359' },
-        { flag:'🇨🇦', name:'Canada',                code:'+1'   },
-        { flag:'🇨🇱', name:'Chile',                 code:'+56'  },
-        { flag:'🇨🇳', name:'China',                 code:'+86'  },
-        { flag:'🇨🇴', name:'Colombia',              code:'+57'  },
-        { flag:'🇨🇷', name:'Costa Rica',            code:'+506' },
-        { flag:'🇭🇷', name:'Croatia',               code:'+385' },
-        { flag:'🇨🇾', name:'Cyprus',                code:'+357' },
-        { flag:'🇨🇿', name:'Czech Republic',        code:'+420' },
-        { flag:'🇩🇰', name:'Denmark',               code:'+45'  },
-        { flag:'🇪🇬', name:'Egypt',                 code:'+20'  },
-        { flag:'🇪🇪', name:'Estonia',               code:'+372' },
-        { flag:'🇪🇹', name:'Ethiopia',              code:'+251' },
-        { flag:'🇫🇮', name:'Finland',               code:'+358' },
-        { flag:'🇫🇷', name:'France',                code:'+33'  },
-        { flag:'🇬🇪', name:'Georgia',               code:'+995' },
-        { flag:'🇩🇪', name:'Germany',               code:'+49'  },
-        { flag:'🇬🇭', name:'Ghana',                 code:'+233' },
-        { flag:'🇬🇷', name:'Greece',                code:'+30'  },
-        { flag:'🇬🇹', name:'Guatemala',             code:'+502' },
-        { flag:'🇭🇰', name:'Hong Kong',             code:'+852' },
-        { flag:'🇭🇺', name:'Hungary',               code:'+36'  },
-        { flag:'🇮🇸', name:'Iceland',               code:'+354' },
-        { flag:'🇮🇳', name:'India',                 code:'+91'  },
-        { flag:'🇮🇩', name:'Indonesia',             code:'+62'  },
-        { flag:'🇮🇷', name:'Iran',                  code:'+98'  },
-        { flag:'🇮🇶', name:'Iraq',                  code:'+964' },
-        { flag:'🇮🇪', name:'Ireland',               code:'+353' },
-        { flag:'🇮🇱', name:'Israel',                code:'+972' },
-        { flag:'🇮🇹', name:'Italy',                 code:'+39'  },
-        { flag:'🇯🇵', name:'Japan',                 code:'+81'  },
-        { flag:'🇯🇴', name:'Jordan',                code:'+962' },
-        { flag:'🇰🇿', name:'Kazakhstan',            code:'+7'   },
-        { flag:'🇰🇪', name:'Kenya',                 code:'+254' },
-        { flag:'🇰🇼', name:'Kuwait',                code:'+965' },
-        { flag:'🇱🇻', name:'Latvia',                code:'+371' },
-        { flag:'🇱🇧', name:'Lebanon',               code:'+961' },
-        { flag:'🇱🇹', name:'Lithuania',             code:'+370' },
-        { flag:'🇱🇺', name:'Luxembourg',            code:'+352' },
-        { flag:'🇲🇾', name:'Malaysia',              code:'+60'  },
-        { flag:'🇲🇻', name:'Maldives',              code:'+960' },
-        { flag:'🇲🇹', name:'Malta',                 code:'+356' },
-        { flag:'🇲🇽', name:'Mexico',                code:'+52'  },
-        { flag:'🇲🇩', name:'Moldova',               code:'+373' },
-        { flag:'🇲🇳', name:'Mongolia',              code:'+976' },
-        { flag:'🇲🇦', name:'Morocco',               code:'+212' },
-        { flag:'🇲🇲', name:'Myanmar',               code:'+95'  },
-        { flag:'🇳🇵', name:'Nepal',                 code:'+977' },
-        { flag:'🇳🇱', name:'Netherlands',           code:'+31'  },
-        { flag:'🇳🇿', name:'New Zealand',           code:'+64'  },
-        { flag:'🇳🇬', name:'Nigeria',               code:'+234' },
-        { flag:'🇳🇴', name:'Norway',                code:'+47'  },
-        { flag:'🇴🇲', name:'Oman',                  code:'+968' },
-        { flag:'🇵🇰', name:'Pakistan',              code:'+92'  },
-        { flag:'🇵🇦', name:'Panama',                code:'+507' },
-        { flag:'🇵🇭', name:'Philippines',           code:'+63'  },
-        { flag:'🇵🇱', name:'Poland',                code:'+48'  },
-        { flag:'🇵🇹', name:'Portugal',              code:'+351' },
-        { flag:'🇶🇦', name:'Qatar',                 code:'+974' },
-        { flag:'🇷🇴', name:'Romania',               code:'+40'  },
-        { flag:'🇷🇺', name:'Russia',                code:'+7'   },
-        { flag:'🇸🇦', name:'Saudi Arabia',          code:'+966' },
-        { flag:'🇷🇸', name:'Serbia',                code:'+381' },
-        { flag:'🇸🇬', name:'Singapore',             code:'+65'  },
-        { flag:'🇸🇰', name:'Slovakia',              code:'+421' },
-        { flag:'🇿🇦', name:'South Africa',          code:'+27'  },
-        { flag:'🇪🇸', name:'Spain',                 code:'+34'  },
-        { flag:'🇱🇰', name:'Sri Lanka',             code:'+94'  },
-        { flag:'🇸🇪', name:'Sweden',                code:'+46'  },
-        { flag:'🇨🇭', name:'Switzerland',           code:'+41'  },
-        { flag:'🇹🇼', name:'Taiwan',                code:'+886' },
-        { flag:'🇹🇿', name:'Tanzania',              code:'+255' },
-        { flag:'🇹🇭', name:'Thailand',              code:'+66'  },
-        { flag:'🇹🇳', name:'Tunisia',               code:'+216' },
-        { flag:'🇹🇷', name:'Turkey',                code:'+90'  },
-        { flag:'🇺🇬', name:'Uganda',                code:'+256' },
-        { flag:'🇺🇦', name:'Ukraine',               code:'+380' },
-        { flag:'🇦🇪', name:'UAE',                   code:'+971' },
-        { flag:'🇬🇧', name:'United Kingdom',        code:'+44'  },
-        { flag:'🇺🇸', name:'United States',         code:'+1'   },
-        { flag:'🇺🇿', name:'Uzbekistan',            code:'+998' },
-        { flag:'🇻🇳', name:'Vietnam',               code:'+84'  },
-        { flag:'🇾🇪', name:'Yemen',                 code:'+967' },
-        { flag:'🇿🇲', name:'Zambia',                code:'+260' },
-        { flag:'🇿🇼', name:'Zimbabwe',              code:'+263' },
+        { flag:'ðŸ‡¦ðŸ‡«', name:'Afghanistan',           code:'+93'  },
+        { flag:'ðŸ‡¦ðŸ‡±', name:'Albania',               code:'+355' },
+        { flag:'ðŸ‡©ðŸ‡¿', name:'Algeria',               code:'+213' },
+        { flag:'ðŸ‡¦ðŸ‡·', name:'Argentina',             code:'+54'  },
+        { flag:'ðŸ‡¦ðŸ‡²', name:'Armenia',               code:'+374' },
+        { flag:'ðŸ‡¦ðŸ‡º', name:'Australia',             code:'+61'  },
+        { flag:'ðŸ‡¦ðŸ‡¹', name:'Austria',               code:'+43'  },
+        { flag:'ðŸ‡¦ðŸ‡¿', name:'Azerbaijan',            code:'+994' },
+        { flag:'ðŸ‡§ðŸ‡­', name:'Bahrain',               code:'+973' },
+        { flag:'ðŸ‡§ðŸ‡©', name:'Bangladesh',            code:'+880' },
+        { flag:'ðŸ‡§ðŸ‡¾', name:'Belarus',               code:'+375' },
+        { flag:'ðŸ‡§ðŸ‡ª', name:'Belgium',               code:'+32'  },
+        { flag:'ðŸ‡§ðŸ‡·', name:'Brazil',                code:'+55'  },
+        { flag:'ðŸ‡§ðŸ‡³', name:'Brunei',                code:'+673' },
+        { flag:'ðŸ‡§ðŸ‡¬', name:'Bulgaria',              code:'+359' },
+        { flag:'ðŸ‡¨ðŸ‡¦', name:'Canada',                code:'+1'   },
+        { flag:'ðŸ‡¨ðŸ‡±', name:'Chile',                 code:'+56'  },
+        { flag:'ðŸ‡¨ðŸ‡³', name:'China',                 code:'+86'  },
+        { flag:'ðŸ‡¨ðŸ‡´', name:'Colombia',              code:'+57'  },
+        { flag:'ðŸ‡¨ðŸ‡·', name:'Costa Rica',            code:'+506' },
+        { flag:'ðŸ‡­ðŸ‡·', name:'Croatia',               code:'+385' },
+        { flag:'ðŸ‡¨ðŸ‡¾', name:'Cyprus',                code:'+357' },
+        { flag:'ðŸ‡¨ðŸ‡¿', name:'Czech Republic',        code:'+420' },
+        { flag:'ðŸ‡©ðŸ‡°', name:'Denmark',               code:'+45'  },
+        { flag:'ðŸ‡ªðŸ‡¬', name:'Egypt',                 code:'+20'  },
+        { flag:'ðŸ‡ªðŸ‡ª', name:'Estonia',               code:'+372' },
+        { flag:'ðŸ‡ªðŸ‡¹', name:'Ethiopia',              code:'+251' },
+        { flag:'ðŸ‡«ðŸ‡®', name:'Finland',               code:'+358' },
+        { flag:'ðŸ‡«ðŸ‡·', name:'France',                code:'+33'  },
+        { flag:'ðŸ‡¬ðŸ‡ª', name:'Georgia',               code:'+995' },
+        { flag:'ðŸ‡©ðŸ‡ª', name:'Germany',               code:'+49'  },
+        { flag:'ðŸ‡¬ðŸ‡­', name:'Ghana',                 code:'+233' },
+        { flag:'ðŸ‡¬ðŸ‡·', name:'Greece',                code:'+30'  },
+        { flag:'ðŸ‡¬ðŸ‡¹', name:'Guatemala',             code:'+502' },
+        { flag:'ðŸ‡­ðŸ‡°', name:'Hong Kong',             code:'+852' },
+        { flag:'ðŸ‡­ðŸ‡º', name:'Hungary',               code:'+36'  },
+        { flag:'ðŸ‡®ðŸ‡¸', name:'Iceland',               code:'+354' },
+        { flag:'ðŸ‡®ðŸ‡³', name:'India',                 code:'+91'  },
+        { flag:'ðŸ‡®ðŸ‡©', name:'Indonesia',             code:'+62'  },
+        { flag:'ðŸ‡®ðŸ‡·', name:'Iran',                  code:'+98'  },
+        { flag:'ðŸ‡®ðŸ‡¶', name:'Iraq',                  code:'+964' },
+        { flag:'ðŸ‡®ðŸ‡ª', name:'Ireland',               code:'+353' },
+        { flag:'ðŸ‡®ðŸ‡±', name:'Israel',                code:'+972' },
+        { flag:'ðŸ‡®ðŸ‡¹', name:'Italy',                 code:'+39'  },
+        { flag:'ðŸ‡¯ðŸ‡µ', name:'Japan',                 code:'+81'  },
+        { flag:'ðŸ‡¯ðŸ‡´', name:'Jordan',                code:'+962' },
+        { flag:'ðŸ‡°ðŸ‡¿', name:'Kazakhstan',            code:'+7'   },
+        { flag:'ðŸ‡°ðŸ‡ª', name:'Kenya',                 code:'+254' },
+        { flag:'ðŸ‡°ðŸ‡¼', name:'Kuwait',                code:'+965' },
+        { flag:'ðŸ‡±ðŸ‡»', name:'Latvia',                code:'+371' },
+        { flag:'ðŸ‡±ðŸ‡§', name:'Lebanon',               code:'+961' },
+        { flag:'ðŸ‡±ðŸ‡¹', name:'Lithuania',             code:'+370' },
+        { flag:'ðŸ‡±ðŸ‡º', name:'Luxembourg',            code:'+352' },
+        { flag:'ðŸ‡²ðŸ‡¾', name:'Malaysia',              code:'+60'  },
+        { flag:'ðŸ‡²ðŸ‡»', name:'Maldives',              code:'+960' },
+        { flag:'ðŸ‡²ðŸ‡¹', name:'Malta',                 code:'+356' },
+        { flag:'ðŸ‡²ðŸ‡½', name:'Mexico',                code:'+52'  },
+        { flag:'ðŸ‡²ðŸ‡©', name:'Moldova',               code:'+373' },
+        { flag:'ðŸ‡²ðŸ‡³', name:'Mongolia',              code:'+976' },
+        { flag:'ðŸ‡²ðŸ‡¦', name:'Morocco',               code:'+212' },
+        { flag:'ðŸ‡²ðŸ‡²', name:'Myanmar',               code:'+95'  },
+        { flag:'ðŸ‡³ðŸ‡µ', name:'Nepal',                 code:'+977' },
+        { flag:'ðŸ‡³ðŸ‡±', name:'Netherlands',           code:'+31'  },
+        { flag:'ðŸ‡³ðŸ‡¿', name:'New Zealand',           code:'+64'  },
+        { flag:'ðŸ‡³ðŸ‡¬', name:'Nigeria',               code:'+234' },
+        { flag:'ðŸ‡³ðŸ‡´', name:'Norway',                code:'+47'  },
+        { flag:'ðŸ‡´ðŸ‡²', name:'Oman',                  code:'+968' },
+        { flag:'ðŸ‡µðŸ‡°', name:'Pakistan',              code:'+92'  },
+        { flag:'ðŸ‡µðŸ‡¦', name:'Panama',                code:'+507' },
+        { flag:'ðŸ‡µðŸ‡­', name:'Philippines',           code:'+63'  },
+        { flag:'ðŸ‡µðŸ‡±', name:'Poland',                code:'+48'  },
+        { flag:'ðŸ‡µðŸ‡¹', name:'Portugal',              code:'+351' },
+        { flag:'ðŸ‡¶ðŸ‡¦', name:'Qatar',                 code:'+974' },
+        { flag:'ðŸ‡·ðŸ‡´', name:'Romania',               code:'+40'  },
+        { flag:'ðŸ‡·ðŸ‡º', name:'Russia',                code:'+7'   },
+        { flag:'ðŸ‡¸ðŸ‡¦', name:'Saudi Arabia',          code:'+966' },
+        { flag:'ðŸ‡·ðŸ‡¸', name:'Serbia',                code:'+381' },
+        { flag:'ðŸ‡¸ðŸ‡¬', name:'Singapore',             code:'+65'  },
+        { flag:'ðŸ‡¸ðŸ‡°', name:'Slovakia',              code:'+421' },
+        { flag:'ðŸ‡¿ðŸ‡¦', name:'South Africa',          code:'+27'  },
+        { flag:'ðŸ‡ªðŸ‡¸', name:'Spain',                 code:'+34'  },
+        { flag:'ðŸ‡±ðŸ‡°', name:'Sri Lanka',             code:'+94'  },
+        { flag:'ðŸ‡¸ðŸ‡ª', name:'Sweden',                code:'+46'  },
+        { flag:'ðŸ‡¨ðŸ‡­', name:'Switzerland',           code:'+41'  },
+        { flag:'ðŸ‡¹ðŸ‡¼', name:'Taiwan',                code:'+886' },
+        { flag:'ðŸ‡¹ðŸ‡¿', name:'Tanzania',              code:'+255' },
+        { flag:'ðŸ‡¹ðŸ‡­', name:'Thailand',              code:'+66'  },
+        { flag:'ðŸ‡¹ðŸ‡³', name:'Tunisia',               code:'+216' },
+        { flag:'ðŸ‡¹ðŸ‡·', name:'Turkey',                code:'+90'  },
+        { flag:'ðŸ‡ºðŸ‡¬', name:'Uganda',                code:'+256' },
+        { flag:'ðŸ‡ºðŸ‡¦', name:'Ukraine',               code:'+380' },
+        { flag:'ðŸ‡¦ðŸ‡ª', name:'UAE',                   code:'+971' },
+        { flag:'ðŸ‡¬ðŸ‡§', name:'United Kingdom',        code:'+44'  },
+        { flag:'ðŸ‡ºðŸ‡¸', name:'United States',         code:'+1'   },
+        { flag:'ðŸ‡ºðŸ‡¿', name:'Uzbekistan',            code:'+998' },
+        { flag:'ðŸ‡»ðŸ‡³', name:'Vietnam',               code:'+84'  },
+        { flag:'ðŸ‡¾ðŸ‡ª', name:'Yemen',                 code:'+967' },
+        { flag:'ðŸ‡¿ðŸ‡²', name:'Zambia',                code:'+260' },
+        { flag:'ðŸ‡¿ðŸ‡¼', name:'Zimbabwe',              code:'+263' },
     ];
 
     /* ================================================================
@@ -267,7 +265,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Close on outside click — must check both wrapper and the portal dropdown
+    // Close on outside click â€” must check both wrapper and the portal dropdown
     document.addEventListener('click', e => {
         if (!e.target.closest('.country-code-wrapper') &&
             !e.target.closest('#countryDropdown')) {
@@ -296,58 +294,7 @@ document.addEventListener('DOMContentLoaded', function () {
     renderCountryList();
 
     /* ================================================================
-       OTP BOX KEYBOARD BEHAVIOUR  (auto-advance, backspace, paste)
-       ================================================================ */
-    function wireOtpBoxes(boxes) {
-        boxes.forEach((box, i) => {
-            box.addEventListener('input', () => {
-                const v = box.value.replace(/\D/g, '');
-                box.value = v ? v[0] : '';
-                box.classList.toggle('filled', !!box.value);
-                if (box.value && i < boxes.length - 1) boxes[i + 1].focus();
-            });
-
-            box.addEventListener('keydown', e => {
-                if (e.key === 'Backspace' && !box.value && i > 0) {
-                    boxes[i - 1].value = '';
-                    boxes[i - 1].classList.remove('filled');
-                    boxes[i - 1].focus();
-                }
-            });
-
-            box.addEventListener('paste', e => {
-                e.preventDefault();
-                const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
-                [...text].slice(0, boxes.length).forEach((ch, j) => {
-                    if (boxes[j]) { boxes[j].value = ch; boxes[j].classList.add('filled'); }
-                });
-                const next = boxes[Math.min(text.length, boxes.length - 1)];
-                if (next) next.focus();
-            });
-        });
-    }
-
-    wireOtpBoxes(emailOtpBoxes);
-
-    function getOtpValue(boxes) {
-        return [...boxes].map(b => b.value).join('');
-    }
-
-    function clearOtpBoxes(boxes) {
-        boxes.forEach(b => { b.value = ''; b.classList.remove('filled', 'error-shake'); });
-    }
-
-    function shakeOtpBoxes(boxes) {
-        boxes.forEach(b => {
-            b.classList.remove('error-shake');
-            void b.offsetWidth;
-            b.classList.add('error-shake');
-        });
-        setTimeout(() => boxes.forEach(b => b.classList.remove('error-shake')), 400);
-    }
-
-    /* ================================================================
-       OTP HELPERS
+       MAGIC LINK HELPERS
        ================================================================ */
     function setStatus(el, msg, type) {
         if (!el) return;
@@ -372,11 +319,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (magicLinkSection) {
                     magicLinkSection.classList.add('visible', 'verified');
                 }
-                setStatus(
-                    magicLinkStatus,
-                    `Email verification temporarily paused${response?.data?.resumeAt ? ` until ${new Date(response.data.resumeAt).toLocaleTimeString()}` : ''}.`,
-                    'success'
-                );
+                setStatus(magicLinkStatus, 'Email verification is temporarily paused.', 'success');
                 if (magicLinkNote) {
                     magicLinkNote.textContent = 'You can continue without opening a magic link.';
                 }
@@ -413,102 +356,174 @@ document.addEventListener('DOMContentLoaded', function () {
         return t;
     }
 
-    /* ================================================================
-       MAGIC LINK
-       ================================================================ */
-    async function sendEmailOtp() {
+    function stopVerificationPolling() {
+        if (emailVerificationPollInterval) {
+            clearInterval(emailVerificationPollInterval);
+            emailVerificationPollInterval = null;
+        }
+        if (emailVerificationSyncTimeout) {
+            clearTimeout(emailVerificationSyncTimeout);
+            emailVerificationSyncTimeout = null;
+        }
+        pendingVerificationEmail = '';
+        localStorage.removeItem('pendingSignupMagicLinkEmail');
+    }
+
+    function queueVerificationPolling(email) {
         if (!emailVerificationRequired) {
             return;
         }
 
-        if (!emailInput.value.trim() || !validateEmail(emailInput.value.trim())) {
-            setStatus(emailOtpStatus, '✗ Enter a valid email first.', 'error');
-            emailInput.focus(); return;
-        }
-
-        sendEmailOtpBtn.disabled = true;
-        sendEmailOtpBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Sending...</span>';
-
-        try {
-            const response = await APIUtils.post(
-                API_CONFIG.ENDPOINTS.AUTH.SEND_SIGNUP_MAGIC_LINK,
-                { email: emailInput.value.trim(), redirectTo: `${window.location.origin}/signup.html` },
-                { includeAuth: false }
-            );
-
-            if (response?.data?.devOtp) {
-                console.info('[DEV] Magic link code:', response.data.devOtp);
-            }
-        } catch (error) {
-            setStatus(emailOtpStatus, `✗ ${error.message || 'Failed to send magic link'}`, 'error');
-            sendEmailOtpBtn.disabled = false;
-            sendEmailOtpBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Magic Link</span>';
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        if (!normalizedEmail || !validateEmail(normalizedEmail)) {
+            stopVerificationPolling();
             return;
         }
 
-        clearOtpBoxes(emailOtpBoxes);
-        emailOtpSection.classList.add('visible');
-        emailOtpSection.classList.remove('verified');
+        if (emailVerificationSyncTimeout) {
+            clearTimeout(emailVerificationSyncTimeout);
+        }
+
+        emailVerificationSyncTimeout = setTimeout(() => {
+            startVerificationPolling(normalizedEmail);
+        }, 300);
+    }
+
+    function applyVerifiedState(email, verificationToken, message = 'Magic link verified successfully!') {
+        emailVerified = true;
+        emailVerificationToken = verificationToken || '';
+
+        if (email) {
+            emailInput.value = email;
+        }
+        emailInput.classList.add('verified');
+        emailInput.readOnly = true;
+
+        if (magicLinkSection) {
+            magicLinkSection.classList.add('visible', 'verified');
+        }
+        if (sendMagicLinkBtn) {
+            sendMagicLinkBtn.disabled = true;
+            sendMagicLinkBtn.classList.add('sent');
+            sendMagicLinkBtn.innerHTML = '<i class="fas fa-check"></i><span>Link Verified</span>';
+        }
+        setStatus(magicLinkStatus, message, 'success');
+        if (magicLinkNote) {
+            magicLinkNote.textContent = 'Verified and synced across devices.';
+        }
+
+        if (emailResendInterval) {
+            clearInterval(emailResendInterval);
+            emailResendInterval = null;
+        }
+
+        stopVerificationPolling();
+    }
+
+    async function pollVerificationStatus() {
+        if (!pendingVerificationEmail || emailVerified) {
+            return;
+        }
+
+        try {
+            const response = await APIUtils.get(
+                `${API_CONFIG.ENDPOINTS.AUTH.SIGNUP_EMAIL_VERIFICATION_STATUS}?email=${encodeURIComponent(pendingVerificationEmail)}`,
+                { includeAuth: false, showError: false }
+            );
+
+            const data = response?.data || {};
+            if (data.paused) {
+                if (magicLinkNote) {
+                    magicLinkNote.textContent = `Verification paused until ${data.resumeAt ? new Date(data.resumeAt).toLocaleString() : 'later'}.`;
+                }
+                stopVerificationPolling();
+                return;
+            }
+
+            if (data.verified && data.verificationToken) {
+                applyVerifiedState(
+                    data.email || pendingVerificationEmail,
+                    data.verificationToken,
+                    'Email verified on another device!'
+                );
+            } else if (data.pending && magicLinkNote) {
+                magicLinkNote.textContent = 'Waiting for you to tap the link on another device...';
+            }
+        } catch (error) {
+            // Temporary network glitches should not break the polling flow.
+        }
+    }
+
+    function startVerificationPolling(email) {
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        if (!normalizedEmail) {
+            return;
+        }
+
+        stopVerificationPolling();
+        pendingVerificationEmail = normalizedEmail;
+        localStorage.setItem('pendingSignupMagicLinkEmail', normalizedEmail);
+
+        pollVerificationStatus();
+        emailVerificationPollInterval = setInterval(pollVerificationStatus, 2000);
+    }
+
+    async function handleMagicLinkSend() {
+        if (!emailVerificationRequired) {
+            return;
+        }
+
+        const email = emailInput.value.trim();
+        if (!email || !validateEmail(email)) {
+            setStatus(magicLinkStatus, 'Enter a valid email first.', 'error');
+            emailInput.focus();
+            return;
+        }
+
+        if (sendMagicLinkBtn) {
+            sendMagicLinkBtn.disabled = true;
+            sendMagicLinkBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i><span>Sending...</span>';
+        }
+
+        try {
+            await APIUtils.post(
+                API_CONFIG.ENDPOINTS.AUTH.SEND_SIGNUP_MAGIC_LINK,
+                { email, redirectTo: MAGIC_LINK_REDIRECT_URL },
+                { includeAuth: false }
+            );
+        } catch (error) {
+            setStatus(magicLinkStatus, error.message || 'Failed to send magic link', 'error');
+            if (sendMagicLinkBtn) {
+                sendMagicLinkBtn.disabled = false;
+                sendMagicLinkBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Magic Link</span>';
+            }
+            return;
+        }
+
         emailVerified = false;
         emailVerificationToken = '';
         emailInput.classList.remove('verified');
+        emailInput.readOnly = false;
 
-        sendEmailOtpBtn.disabled = true;
-        sendEmailOtpBtn.innerHTML = '<i class="fas fa-check"></i><span>Link Sent</span>';
-        sendEmailOtpBtn.classList.add('sent');
-
-        setStatus(emailOtpStatus, '', '');
-        emailOtpBoxes[0]?.focus?.();
-
-        emailResendInterval = startResendTimer(sendEmailOtpBtn, emailResend, emailResendInterval, () => {
-            sendEmailOtpBtn.classList.remove('sent');
-            sendEmailOtpBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Magic Link</span>';
-            emailResend.innerHTML = '';
-            sendEmailOtp();
-        });
-    }
-
-    async function verifyEmailOtp() {
-        if (!emailVerificationRequired) {
-            return;
+        if (magicLinkSection) {
+            magicLinkSection.classList.add('visible');
+            magicLinkSection.classList.remove('verified');
         }
 
-        const entered = getOtpValue(emailOtpBoxes);
-        if (entered.length < 6) { setStatus(emailOtpStatus, '✗ Please fill all 6 digits.', 'error'); return; }
-
-        verifyEmailOtpBtn.disabled = true;
-        try {
-            const response = await APIUtils.post(
-                API_CONFIG.ENDPOINTS.AUTH.VERIFY_SIGNUP_EMAIL_LINK,
-                { email: emailInput.value.trim(), otp: entered },
-                { includeAuth: false }
-            );
-
-            emailVerificationToken = response?.data?.verificationToken || '';
-            if (!emailVerificationToken) {
-                throw new Error('Missing email verification token');
-            }
-
-            emailVerified = true;
-            emailInput.classList.add('verified');
-            emailInput.readOnly = true;
-            emailOtpSection.classList.add('verified');
-            verifyEmailOtpBtn.disabled = true;
-            clearInterval(emailResendInterval);
-            emailResend.innerHTML = '';
-            setStatus(emailOtpStatus, '✓ Magic link verified successfully!', 'success');
-        } catch (error) {
-            verifyEmailOtpBtn.disabled = false;
-            setStatus(emailOtpStatus, '✗ Magic link verification failed. Try again.', 'error');
-            shakeOtpBoxes(emailOtpBoxes);
-            clearOtpBoxes(emailOtpBoxes);
-            emailOtpBoxes[0]?.focus?.();
+        if (sendMagicLinkBtn) {
+            sendMagicLinkBtn.disabled = true;
+            sendMagicLinkBtn.innerHTML = '<i class="fas fa-check"></i><span>Link Sent</span>';
+            sendMagicLinkBtn.classList.add('sent');
         }
-    }
 
-    sendEmailOtpBtn.addEventListener('click', sendEmailOtp);
-    verifyEmailOtpBtn.addEventListener('click', verifyEmailOtp);
-    loadEmailVerificationStatus();
+        setStatus(magicLinkStatus, 'Magic link sent. Check your inbox.', 'success');
+        if (magicLinkNote) {
+            magicLinkNote.textContent = 'Waiting for you to tap the link on another device...';
+        }
+
+        startVerificationPolling(email);
+        emailResendInterval = startResendTimer(sendMagicLinkBtn, magicLinkNote, emailResendInterval, handleMagicLinkSend);
+    }
 
     async function tryVerifyEmailFromMagicLink() {
         try {
@@ -537,51 +552,63 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const email = response?.data?.email || '';
-            emailVerificationToken = response?.data?.verificationToken || '';
-            if (!email || !emailVerificationToken) {
+            const verificationToken = response?.data?.verificationToken || '';
+            if (!email || !verificationToken) {
                 return;
             }
 
-            emailInput.value = email;
-            emailVerified = true;
-            emailInput.classList.add('verified');
-            emailInput.readOnly = true;
-            emailOtpSection.classList.add('visible', 'verified');
-            if (sendMagicLinkBtn) {
-                sendMagicLinkBtn.disabled = true;
-                sendMagicLinkBtn.classList.add('sent');
-                sendMagicLinkBtn.innerHTML = '<i class="fas fa-check"></i><span>Link Verified</span>';
-            }
-            verifyEmailOtpBtn.disabled = true;
-            setStatus(emailOtpStatus, '✓ Magic link verified successfully!', 'success');
-            if (emailResend) {
-                emailResend.innerHTML = '';
-            }
-            if (emailResendInterval) {
-                clearInterval(emailResendInterval);
-            }
+            applyVerifiedState(email, verificationToken);
 
-            // Clean token params from URL after verification.
             const clean = `${window.location.origin}${window.location.pathname}`;
             window.history.replaceState({}, document.title, clean);
         } catch (error) {
-            // Keep the manual magic-link path available if verification fails.
+            // Keep the polling path available if the direct callback fails.
         }
     }
 
-    tryVerifyEmailFromMagicLink();
+    if (sendMagicLinkBtn) {
+        sendMagicLinkBtn.addEventListener('click', handleMagicLinkSend);
+    }
+    loadEmailVerificationStatus();
+
+    const storedPendingEmail = localStorage.getItem('pendingSignupMagicLinkEmail');
+    if (storedPendingEmail && !emailInput.value.trim()) {
+        emailInput.value = storedPendingEmail;
+        queueVerificationPolling(storedPendingEmail);
+    }
+
+    tryVerifyEmailFromMagicLink().finally(() => {
+        if (emailVerified) {
+            stopVerificationPolling();
+        }
+    });
+
+    queueVerificationPolling(emailInput.value);
 
     emailInput.addEventListener('input', () => {
         emailVerified = false;
         emailVerificationToken = '';
         emailInput.readOnly = false;
+        stopVerificationPolling();
         if (sendMagicLinkBtn) {
             sendMagicLinkBtn.disabled = false;
             sendMagicLinkBtn.classList.remove('sent');
             sendMagicLinkBtn.innerHTML = '<i class="fas fa-paper-plane"></i><span>Send Magic Link</span>';
         }
-        verifyEmailOtpBtn.disabled = false;
-        emailOtpSection.classList.remove('verified');
+        if (magicLinkSection) {
+            magicLinkSection.classList.remove('verified');
+        }
+        if (magicLinkNote) {
+            magicLinkNote.textContent = 'The page will update automatically when you open the link on any device.';
+        }
+        setStatus(magicLinkStatus, '', '');
+        queueVerificationPolling(emailInput.value);
+    });
+
+    window.addEventListener('focus', () => {
+        if (!emailVerified) {
+            queueVerificationPolling(emailInput.value);
+        }
     });
 
     /* ================================================================
@@ -616,14 +643,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 confirmPasswordInput.style.boxShadow  = '0 0 5px rgba(244,67,54,0.3)';
                 const e = document.createElement('small');
                 e.className = 'error-message';
-                e.textContent = '✗ Passwords do not match';
+                e.textContent = 'âœ— Passwords do not match';
                 confirmPasswordInput.parentElement.appendChild(e);
             } else {
                 confirmPasswordInput.style.borderColor = '#4caf50';
                 confirmPasswordInput.style.boxShadow  = '0 0 5px rgba(76,175,80,0.3)';
                 const s = document.createElement('small');
                 s.className = 'success-message';
-                s.textContent = '✓ Passwords match';
+                s.textContent = 'âœ“ Passwords match';
                 confirmPasswordInput.parentElement.appendChild(s);
             }
         } else {
