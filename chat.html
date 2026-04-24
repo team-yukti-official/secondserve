@@ -289,6 +289,9 @@
       window.ENV_CONFIG?.AI?.OPENROUTER_API_KEY ||
       localStorage.getItem("feedlink_openrouter_api_key") ||
       "";
+    const API_BASE =
+      (window.ENV_CONFIG?.API_BASE_URL || localStorage.getItem("apiBaseUrl") || "https://secondserve-m33f.onrender.com/api").replace(/\/$/, "");
+    const CHAT_API_URL = `${API_BASE}/ai/chat`;
     const OPENROUTER_MODEL =
       window.ENV_CONFIG?.AI?.OPENROUTER_MODEL ||
       "openai/gpt-oss-20b";
@@ -336,11 +339,6 @@ Always promote donation and positivity.
 
       const fixed = getFixedReply(text);
       if (fixed) { addMsg(fixed, "bot"); return; }
-
-      if (!API_KEY) {
-        addMsg("AI assistant is temporarily unavailable, but I can still help with donation basics here.", "bot");
-        return;
-      }
 
       const replyNode = showTyping();
       try {
@@ -392,102 +390,33 @@ Always promote donation and positivity.
     }
 
     async function askGPT(messages, onChunk) {
-      if (!API_KEY) {
-        throw new Error("Missing AI key");
-      }
-
       const requestMessages = messages.slice(-MAX_CHAT_HISTORY);
 
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      const backendResponse = await fetch(CHAT_API_URL, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${API_KEY}`,
           "Content-Type": "application/json",
-          "Accept": "text/event-stream, application/json",
-          "HTTP-Referer": window.location.href,
-          "X-Title": "FeedLink AI"
+          "Accept": "application/json"
         },
         body: JSON.stringify({
           model: OPENROUTER_MODEL,
           messages: requestMessages,
           temperature: 0.4,
           max_tokens: 220,
-          stream: true
+          apiKey: API_KEY
         })
       });
-      if (!res.ok) {
-        throw new Error("AI request failed");
+
+      if (!backendResponse.ok) {
+        const errorText = await backendResponse.text();
+        throw new Error(errorText || "AI request failed");
       }
 
-      const contentType = res.headers.get("content-type") || "";
-      if (!res.body || !contentType.includes("text/event-stream")) {
-        const data = await res.json();
-        return data?.choices?.[0]?.message?.content || "I'm here to help with Second Serve & Second Smile.";
+      const data = await backendResponse.json();
+      if (typeof onChunk === "function") {
+        onChunk(data?.reply || "");
       }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let fullReply = "";
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const parts = buffer.split(/\r?\n/);
-        buffer = parts.pop() || "";
-
-        for (const line of parts) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-
-          const payload = trimmed.slice(5).trim();
-          if (!payload || payload === "[DONE]") {
-            continue;
-          }
-
-          let chunk;
-          try {
-            chunk = JSON.parse(payload);
-          } catch (err) {
-            continue;
-          }
-
-          const delta =
-            chunk?.choices?.[0]?.delta?.content ||
-            chunk?.choices?.[0]?.message?.content ||
-            "";
-
-          if (delta) {
-            fullReply += delta;
-            if (typeof onChunk === "function") {
-              onChunk(fullReply);
-            }
-          }
-        }
-      }
-
-      if (buffer.trim().startsWith("data:")) {
-        const payload = buffer.trim().slice(5).trim();
-        if (payload && payload !== "[DONE]") {
-          try {
-            const chunk = JSON.parse(payload);
-            const delta =
-              chunk?.choices?.[0]?.delta?.content ||
-              chunk?.choices?.[0]?.message?.content ||
-              "";
-            if (delta) {
-              fullReply += delta;
-              if (typeof onChunk === "function") onChunk(fullReply);
-            }
-          } catch (err) {
-            // Ignore trailing parse issues and use what we already collected.
-          }
-        }
-      }
-
-      return fullReply.trim() || "I'm here to help with Second Serve & Second Smile.";
+      return data?.reply || "I'm here to help with Second Serve & Second Smile.";
     }
 
     function addMsg(text, type) {

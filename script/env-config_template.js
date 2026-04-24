@@ -17,8 +17,9 @@ const ENV_CONFIG = {
     API_BASE_URL: 'https://secondserve-m33f.onrender.com/api', // Change this to your backend URL
 
     // AI configuration for browser features like chat.html
+    // The chat UI now uses the backend proxy at /api/ai/chat.
     AI: {
-        OPENROUTER_API_KEY: 'your_openrouter_api_key_here',
+        OPENROUTER_API_KEY: '',
         OPENROUTER_MODEL: 'openai/gpt-oss-20b'
     },
 
