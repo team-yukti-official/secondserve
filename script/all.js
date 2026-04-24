@@ -294,9 +294,13 @@ function updateAuthUI() {
             window.location.href = routes[userType] || 'login.html';
         };
 
-    } else {
+    }else {
         // Not logged in — restore icon + original label for this page
-        const label = loginBtn.dataset.label || 'Join';
+        const label =
+            loginBtn.dataset.authLabel ||
+            loginBtn.dataset.label ||
+            loginBtn.textContent.replace(/\s+/g, ' ').trim().replace(/^.*?\s*/, '') ||
+            'Join';
         loginBtn.innerHTML = `<i class="fas fa-user"></i> ${label}`;
         loginBtn.onclick = null;
         loginBtn.href = 'login.html';
