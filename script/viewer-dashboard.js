@@ -10,7 +10,7 @@
     { id:'immortal', emoji:'👑', name:'Immortal Giver', req:500, cssClass:'badge-immortal' }
   ];
 
-  const BASE = (typeof API_CONFIG!=='undefined' ? API_CONFIG.BASE_URL : null) || localStorage.getItem('apiBaseUrl') || 'http://localhost:5000/api';
+  const BASE = (typeof API_CONFIG!=='undefined' ? API_CONFIG.BASE_URL : null) || localStorage.getItem('apiBaseUrl') || 'https://secondserve-m33f.onrender.com/api';
   const TK = (typeof API_CONFIG!=='undefined' ? API_CONFIG.TOKEN_KEY : null) || 'feedlink_auth_token';
 
   function getToken(){ return sessionStorage.getItem(TK) || localStorage.getItem(TK); }

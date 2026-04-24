@@ -1269,7 +1269,7 @@ body.dark-mode .status-pill.rejected {
                                 </div>
                                 <div class="info-item">
                                     <span>API Endpoint:</span>
-                                    <strong>localhost:5000</strong>
+                                    <strong>https://secondserve-m33f.onrender.com/api</strong>
                                 </div>
                                 <div class="info-item">
                                     <span>Node Version:</span>
@@ -1340,7 +1340,7 @@ if (!getAdminSession()) {
 }
 
 // API Configuration
-const API_BASE = window.ENV_CONFIG?.API_BASE_URL || 'http://localhost:5000/api';
+const API_BASE = window.ENV_CONFIG?.API_BASE_URL || 'https://secondserve-m33f.onrender.com/api';
 let charts = {};
 let allUsers = [];
 let allDonations = [];
@@ -1435,7 +1435,7 @@ async function loadOverviewData() {
 
     } catch (error) {
         console.error('Error loading overview:', error);
-        alert('SecondServe admin data could not load. Make sure the API server is running on localhost:5000.');
+        alert('SecondServe admin data could not load. Make sure the API server is running at https://secondserve-m33f.onrender.com/api.');
     }
 }
 

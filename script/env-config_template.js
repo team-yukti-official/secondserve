@@ -8,13 +8,13 @@
  * 4. Reference this file BEFORE api-config.js in your HTML files
  * 
  * For development, you can also set these values directly in the browser console:
- * localStorage.setItem('apiBaseUrl', 'http://localhost:5000/api');
+ * localStorage.setItem('apiBaseUrl', 'https://secondserve-m33f.onrender.com/api');
  */
 
 // DEVELOPMENT CONFIGURATION
 const ENV_CONFIG = {
     // Backend API Base URL
-    API_BASE_URL: 'http://localhost:5000/api', // Change this to your backend URL
+    API_BASE_URL: 'https://secondserve-m33f.onrender.com/api', // Change this to your backend URL
 
     // AI configuration for browser features like chat.html
     AI: {
@@ -63,6 +63,11 @@ window.ENV_CONFIG = ENV_CONFIG;
 // Override API_CONFIG if env-config exists
 if (window.API_CONFIG) {
     window.API_CONFIG.BASE_URL = ENV_CONFIG.API_BASE_URL;
+}
+
+const legacyApiBaseUrl = localStorage.getItem('apiBaseUrl');
+if (!legacyApiBaseUrl || legacyApiBaseUrl === 'http://localhost:5000/api') {
+    localStorage.setItem('apiBaseUrl', ENV_CONFIG.API_BASE_URL);
 }
 
 // Optionally set up logging based on DEBUG_MODE

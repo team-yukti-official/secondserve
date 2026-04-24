@@ -7,10 +7,17 @@
  * - Bug #18: UNFOLLOW documented to use DELETE method
  */
 
+const DEFAULT_API_BASE_URL = 'https://secondserve-m33f.onrender.com/api';
+const LEGACY_API_BASE_URL = 'http://localhost:5000/api';
+
 const API_CONFIG = {
     // Getter so runtime changes to localStorage['apiBaseUrl'] are always picked up
     get BASE_URL() {
-        return localStorage.getItem('apiBaseUrl') || 'http://localhost:5000/api';
+        const stored = localStorage.getItem('apiBaseUrl');
+        if (stored && stored !== LEGACY_API_BASE_URL) {
+            return stored;
+        }
+        return DEFAULT_API_BASE_URL;
     },
 
     // API Endpoints
