@@ -358,7 +358,6 @@ body.page-transitioning > :not(script):not(style) {
 /* ===== HERO SECTION ===== */
 .hero {
     background: var(--primary-gradient);
-    color: white;
     padding: 110px 24px 90px;
     text-align: center;
     position: relative;
