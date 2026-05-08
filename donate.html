@@ -320,7 +320,7 @@
                 <div class="form-row full">
                     <div class="form-group">
                         <label for="contactPhone">Contact Number *</label>
-                        <input type="tel" id="contactPhone" placeholder="Your phone number" required>
+                        <input type="tel" id="contactPhone" placeholder="Your phone number" pattern="[0-9]{10}" maxlength="10" required inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)">
                     </div>
                 </div>
             </div>
