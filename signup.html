@@ -256,8 +256,7 @@
 <input type="hidden" id="countryCode" value="+91">
                     </div>
 
-                    <input type="tel" id="phone" class="phone-number-input"
-                              placeholder="Phone Number (Optional)" pattern="[0-9]+" required>
+                   <input type="tel" id="phone" class="phone-number-input" placeholder="Phone Number" pattern="[0-9]{10}" maxlength="10" required inputmode="numeric" oninput="this.value=this.value.replace(/[^0-9]/g,'').slice(0,10)" title="Enter a valid 10-digit mobile number">
                 </div>
 
             </div>
