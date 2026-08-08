@@ -261,7 +261,7 @@ function createFoodCard(donation) {
                     <p><i class="fas fa-map-marker-alt"></i> ${escapeHtml(city)}</p>
                 </div>
                 <div class="food-tags">
-                    ${donation.vegetarian
+                    ${donation.condition === 'vegetarian'
                         ? '<span class="tag">🥬 Vegetarian</span>'
                         : '<span class="tag">🍗 Non-Veg</span>'}
                     ${categories.map(cat => `<span class="tag">${formatCategory(cat)}</span>`).join('')}
