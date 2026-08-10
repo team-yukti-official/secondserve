@@ -164,7 +164,7 @@
             </div>
             <nav class="nav-menu">
                 <a href="#food-listings" class="nav-link">Find Food</a>
-                <a href="donate.html" class="nav-link" onclick="if(typeof AuthManager!=='undefined'&&!AuthManager.isLoggedIn()){event.preventDefault();sessionStorage.setItem('redirectAfterLogin','/food-checker.html');window.location.href='login.html';}">Donate Food</a>
+                <a href="food-check.html" onclick="if(typeof AuthManager!=='undefined'&&!AuthManager.isLoggedIn()){event.preventDefault();sessionStorage.setItem('redirectAfterLogin','/food-check.html');window.location.href='login.html';}">Donate Food</a>
                 <a href="find-ngo.html" class="nav-link">Find NGOs</a>
                 <a href="volunteer.html" class="nav-link">Volunteer</a>
                 <a href="heart.html" class="nav-link">Smile</a>
@@ -433,7 +433,7 @@
                     <h4>Quick Links</h4>
                     <ul>
                         <li><a href="#">Home</a></li>
-                        <li><a href="donate.html">Donate Food</a></li>
+                        <li><a<a href="food-check.html" onclick="if(typeof AuthManager!=='undefined'&&!AuthManager.isLoggedIn()){event.preventDefault();sessionStorage.setItem('redirectAfterLogin','/food-check.html');window.location.href='login.html';}">Donate Food</a></li>
                         <li><a href="find-ngo.html">Find NGOs</a></li>
                         <li><a href="#food-listings">Find Food</a></li>
                         <li><a href="volunteer.html">Volunteer</a></li>
