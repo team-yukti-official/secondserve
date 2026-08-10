@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/food-checker.html"
+    },
+    {
+      "source": "/index.html",
+      "destination": "/food-checker.html"
+    }
+  ]
+}
