@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Food Checker | Second Serve</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="food-checker.css">
+</head>
+
+<body>
+
+    <!-- Navigation: logo + Home only -->
+    <header class="fc-navbar">
+        <div class="fc-navbar-container">
+            <a href="index.html" class="fc-logo" aria-label="Second Serve home">
+                <svg width="200" height="50" viewBox="0 0 200 50">
+                    <defs>
+                        <radialGradient id="plateOuter" cx="50%" cy="40%" r="65%">
+                            <stop offset="0%" stop-color="#ffffff" />
+                            <stop offset="70%" stop-color="#f2f2f2" />
+                            <stop offset="100%" stop-color="#d9d9d9" />
+                        </radialGradient>
+                        <radialGradient id="plateInner" cx="50%" cy="35%" r="70%">
+                            <stop offset="0%" stop-color="#ffffff" />
+                            <stop offset="100%" stop-color="#ececec" />
+                        </radialGradient>
+                        <filter id="fcShadow" x="-50%" y="-50%" width="200%" height="200%">
+                            <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000" flood-opacity="0.3" />
+                        </filter>
+                        <marker id="fcArrow" markerWidth="5" markerHeight="5" refX="4" refY="2.5" orient="auto">
+                            <path d="M0,0 L5,2.5 L0,5 Z" fill="#ffffff" />
+                        </marker>
+                    </defs>
+
+                    <text x="78" y="32" text-anchor="end" font-family="Poppins, sans-serif" font-weight="800"
+                        font-size="18" fill="#ffb300">Second</text>
+
+                    <g transform="translate(100,25)">
+                        <g>
+                            <path d="M 0 -20 A 20 20 0 0 1 20 0" fill="none" stroke="#ffffff" stroke-width="1.3"
+                                marker-end="url(#fcArrow)" />
+                            <path d="M 0 20 A 20 20 0 0 1 -20 0" fill="none" stroke="#ffffff" stroke-width="1.3"
+                                marker-end="url(#fcArrow)" />
+                            <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="6s"
+                                repeatCount="indefinite" />
+                        </g>
+                        <circle cx="0" cy="0" r="11" fill="url(#plateOuter)" stroke="#cfcfcf" stroke-width="0.8"
+                            filter="url(#fcShadow)" />
+                        <circle cx="0" cy="0" r="9" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.8" />
+                        <circle cx="0" cy="0" r="6.5" fill="url(#plateInner)" stroke="#e0e0e0" stroke-width="0.5" />
+                    </g>
+
+                    <text x="122" y="32" text-anchor="start" font-family="Poppins, sans-serif" font-weight="800"
+                        font-size="18" fill="#ffffff">Serve</text>
+                </svg>
+            </a>
+
+            <a href="index.html" class="fc-home-btn">
+                <i class="fas fa-house"></i>
+                <span>Home</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="fc-main">
+
+        <!-- Hero -->
+        <section class="fc-hero">
+            <span class="fc-eyebrow"><i class="fas fa-sparkles"></i> AI Quality Check</span>
+            <h1>Is this food good to give?</h1>
+            <p>Snap or upload a photo of the food. Our AI checks freshness, spoilage signs, and overall quality in
+                seconds — built for donors and pickup volunteers on the go.</p>
+        </section>
+
+        <!-- Uploader -->
+        <section class="fc-card fc-uploader-card">
+
+            <div id="fcDropzone" class="fc-dropzone">
+                <div id="fcDropzoneEmpty" class="fc-dropzone-empty">
+                    <div class="fc-dropzone-icon"><i class="fas fa-camera"></i></div>
+                    <p class="fc-dropzone-title">Add a photo of the food</p>
+                    <p class="fc-dropzone-sub">Drag & drop, or use the buttons below</p>
+                </div>
+                <img id="fcPreviewImg" class="fc-preview-img" alt="Selected food preview" hidden>
+                <button id="fcRemoveBtn" class="fc-remove-btn" type="button" hidden aria-label="Remove photo">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="fc-input-row">
+                <label class="fc-btn fc-btn-outline">
+                    <i class="fas fa-camera"></i> Take Photo
+                    <input type="file" accept="image/*" capture="environment" id="fcCameraInput" hidden>
+                </label>
+                <label class="fc-btn fc-btn-outline">
+                    <i class="fas fa-image"></i> Choose from Gallery
+                    <input type="file" accept="image/*" id="fcGalleryInput" hidden>
+                </label>
+            </div>
+
+            <button id="fcAnalyzeBtn" class="fc-btn fc-btn-primary fc-analyze-btn" type="button" disabled>
+                <i class="fas fa-magnifying-glass"></i> Check Food Quality
+            </button>
+
+            <p id="fcErrorMsg" class="fc-error-msg" hidden></p>
+        </section>
+
+        <!-- Loading -->
+        <section id="fcLoading" class="fc-card fc-loading-card" hidden>
+            <div class="fc-spinner"></div>
+            <p id="fcLoadingMain" aria-live="polite">Analyzing your photo…</p>
+            <span id="fcLoadingSub" class="fc-loading-sub" aria-live="polite">Checking color, texture, and freshness signs</span>
+        </section>
+
+        <!-- Results -->
+        <section id="fcResults" class="fc-results" hidden>
+
+            <div class="fc-card fc-verdict-card">
+                <div id="fcVerdictBadge" class="fc-verdict-badge">
+                    <i id="fcVerdictIcon" class="fas fa-circle-check"></i>
+                    <span id="fcVerdictText">Good to Donate</span>
+                </div>
+                <p id="fcFoodName" class="fc-food-name">Food item</p>
+
+                <div class="fc-score-row">
+                    <div class="fc-score-track">
+                        <div id="fcScoreFill" class="fc-score-fill"></div>
+                    </div>
+                    <span id="fcScoreLabel" class="fc-score-label">0/100</span>
+                </div>
+                <p id="fcCheckSummary" class="fc-check-summary"></p>
+                <p id="fcSummary" class="fc-summary"></p>
+            </div>
+
+            <div class="fc-card">
+                <h3 class="fc-section-title"><i class="fas fa-list-check"></i> Quality Checks</h3>
+                <ul id="fcChecklist" class="fc-checklist"></ul>
+            </div>
+
+            <div id="fcIssuesCard" class="fc-card" hidden>
+                <h3 class="fc-section-title"><i class="fas fa-triangle-exclamation"></i> Things to Note</h3>
+                <ul id="fcIssuesList" class="fc-issues-list"></ul>
+            </div>
+
+            <div class="fc-card fc-recommend-card">
+                <h3 class="fc-section-title"><i class="fas fa-hand-holding-heart"></i> Recommendation</h3>
+                <p id="fcRecommendation"></p>
+            </div>
+
+            <button id="fcDonateBtn" class="fc-btn fc-btn-primary fc-donate-btn" type="button" disabled>
+                <i class="fas fa-hand-holding-dollar"></i> Donate This Food
+            </button>
+
+            <button id="fcAnotherBtn" class="fc-btn fc-btn-outline fc-another-btn" type="button">
+                <i class="fas fa-rotate-left"></i> Check Another Photo
+            </button>
+        </section>
+
+    </main>
+
+    <!-- Load configuration and app -->
+    <script src="env-config.js"></script>
+    <script src="api-config.js"></script>
+    <script src="food-checker.js"></script>
+</body>
+
+</html>
