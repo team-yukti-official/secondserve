@@ -2,6 +2,30 @@ const { supabaseAdmin } = require('../config/supabase');
 const { v4: uuidv4 } = require('uuid');
 const { cleanupExpiredAvailableDonations } = require('../utils/donationExpiry');
 
+function normalizeLocation(value) {
+    return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isVolunteerLocalToPickup(volunteerCity, pickupAddress) {
+    const city = normalizeLocation(volunteerCity);
+    return Boolean(city) && normalizeLocation(pickupAddress).includes(city);
+}
+
+async function getAcceptedRequestForNgo(requestId, ngoId) {
+    const { data: request, error } = await supabaseAdmin
+        .from('pickup_requests')
+        .select('id, donation_id, requester_id, status')
+        .eq('id', requestId)
+        .eq('requester_id', ngoId)
+        .single();
+
+    if (error || !request) return { error: 'Food request not found.' };
+    if (String(request.status).toLowerCase() !== 'accepted') {
+        return { error: 'A volunteer can only be assigned after the food request is accepted.' };
+    }
+    return { request };
+}
+
 function parseQuantityToMeals(quantityString) {
     if (!quantityString) return 0;
     const clean = String(quantityString).toLowerCase().replace(/,/g, ' ').trim();
@@ -389,9 +413,20 @@ const getNgoRequests = async (req, res) => {
             }
         }
 
+        const requestIds = (incomingRequests || []).map((req) => req.id).filter(Boolean);
+        let assignmentMap = new Map();
+        if (requestIds.length) {
+            const { data: assignments } = await supabaseAdmin
+                .from('pickup_volunteer_assignments')
+                .select('pickup_request_id, volunteer_id, assigned_at, volunteers(full_name, city, phone)')
+                .in('pickup_request_id', requestIds);
+            assignmentMap = new Map((assignments || []).map((item) => [item.pickup_request_id, item]));
+        }
+
         const normalizedRequests = (incomingRequests || []).map((req) => {
             const donation = donationMap.get(req.donation_id);
             const donor = donorMap.get(donation?.donor_id);
+            const assignment = assignmentMap.get(req.id);
             return {
                 ...req,
                 donor: donor || null,
@@ -408,12 +443,87 @@ const getNgoRequests = async (req, res) => {
                 latitude: donation?.latitude || null,
                 longitude: donation?.longitude || null,
                 contact_phone: donation?.contact_phone || null,
+                assignment: assignment ? {
+                    volunteerId: assignment.volunteer_id,
+                    volunteerName: assignment.volunteers?.full_name || 'Volunteer',
+                    volunteerCity: assignment.volunteers?.city || '',
+                    volunteerPhone: assignment.volunteers?.phone || '',
+                    assignedAt: assignment.assigned_at
+                } : null,
             };
         });
 
         res.json(normalizedRequests);
     } catch (error) {
         return res.status(500).json({ error: 'Get NGO requests error', details: error.message });
+    }
+};
+
+// Show only approved volunteers whose registered city matches the donation pickup address.
+const getLocalVolunteersForRequest = async (req, res) => {
+    try {
+        const result = await getAcceptedRequestForNgo(req.params.requestId, req.user.id);
+        if (result.error) return res.status(400).json({ error: result.error });
+
+        const { data: donation, error: donationError } = await supabaseAdmin
+            .from('donations')
+            .select('address')
+            .eq('id', result.request.donation_id)
+            .single();
+        if (donationError || !donation?.address) {
+            return res.status(400).json({ error: 'This food request has no pickup location to match with volunteers.' });
+        }
+
+        const { data: volunteers, error } = await supabaseAdmin
+            .from('volunteers')
+            .select('id, full_name, phone, city, role, availability')
+            .eq('status', 'approved')
+            .order('full_name');
+        if (error) return res.status(400).json({ error: 'Unable to load volunteers.', details: error.message });
+
+        const pickupLocation = normalizeLocation(donation.address);
+        const localVolunteers = (volunteers || []).filter((volunteer) => {
+            return isVolunteerLocalToPickup(volunteer.city, pickupLocation);
+        });
+        return res.json({ pickupLocation: donation.address, volunteers: localVolunteers });
+    } catch (error) {
+        return res.status(500).json({ error: 'Get local volunteers error', details: error.message });
+    }
+};
+
+const assignVolunteerToRequest = async (req, res) => {
+    try {
+        const { volunteerId } = req.body || {};
+        if (!volunteerId) return res.status(400).json({ error: 'Choose a volunteer first.' });
+        const result = await getAcceptedRequestForNgo(req.params.requestId, req.user.id);
+        if (result.error) return res.status(400).json({ error: result.error });
+
+        const { data: donation, error: donationError } = await supabaseAdmin
+            .from('donations').select('address').eq('id', result.request.donation_id).single();
+        const { data: volunteer, error: volunteerError } = await supabaseAdmin
+            .from('volunteers').select('id, full_name, city, phone, status').eq('id', volunteerId).single();
+        if (donationError || !donation?.address || volunteerError || !volunteer || String(volunteer.status).toLowerCase() !== 'approved') {
+            return res.status(400).json({ error: 'The selected volunteer is unavailable.' });
+        }
+        if (!isVolunteerLocalToPickup(volunteer.city, donation.address)) {
+            return res.status(400).json({ error: 'Choose a volunteer registered in the pickup location.' });
+        }
+
+        const { data, error } = await supabaseAdmin
+            .from('pickup_volunteer_assignments')
+            .upsert({
+                pickup_request_id: result.request.id,
+                volunteer_id: volunteer.id,
+                assigned_by: req.user.id,
+                assigned_at: new Date().toISOString()
+            }, { onConflict: 'pickup_request_id' })
+            .select()
+            .single();
+        if (error) return res.status(400).json({ error: 'Unable to save the volunteer assignment. Run the assignment migration first.', details: error.message });
+
+        return res.json({ message: `${volunteer.full_name} has been assigned to this pickup.`, assignment: data });
+    } catch (error) {
+        return res.status(500).json({ error: 'Assign volunteer error', details: error.message });
     }
 };
 // Helper function to calculate distance between two coordinates
@@ -438,5 +548,7 @@ module.exports = {
     searchNgos,
     getNgoStatistics,
     getNgoDashboardStats,
-    getNgoRequests
+    getNgoRequests,
+    getLocalVolunteersForRequest,
+    assignVolunteerToRequest
 };
