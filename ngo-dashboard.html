@@ -439,6 +439,15 @@ body.dark-mode .req-name.clickable:hover{color:#ffffff}
 }
 .location-link:hover{background:var(--primary);color:#fff;border-color:rgba(46,125,50,.3);}
 
+.assignment-box{margin-top:10px;padding:10px;border:1px solid rgba(46,125,50,.2);border-radius:var(--r-sm);background:rgba(46,125,50,.045);min-width:250px}
+.assignment-label{display:block;font-size:.72rem;font-weight:700;color:var(--primary);margin-bottom:6px}
+.assignment-controls{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.assignment-select{flex:1;min-width:180px;border:1px solid var(--border);border-radius:8px;padding:7px;font:inherit;font-size:.76rem;color:var(--text-dark);background:var(--card)}
+.assignment-btn{padding:7px 10px;border:0;border-radius:8px;background:var(--primary);color:#fff;font:inherit;font-size:.75rem;font-weight:700;cursor:pointer}
+.assignment-btn:disabled{opacity:.65;cursor:wait}
+.assignment-note{font-size:.71rem;color:var(--text-light);margin:6px 0 0;line-height:1.35}
+body.dark-mode .assignment-select{color:var(--text-dark);background:#fff}
+
 .ab{
   padding:7px 14px;border-radius:var(--r-sm);
   font-size:.77rem;font-weight:700;
@@ -1436,9 +1445,98 @@ function renderReqs(){
       <div class="req-actions">
         ${pend ? `<span class="status-pill sp-pending">Pending (waiting for donor response)</span>` : `<span class="status-pill sp-${r.status}">${r.status.charAt(0).toUpperCase()+r.status.slice(1)}</span>`}
         ${showLocation ? `<a class="location-link" href="${r.pickupLocationUrl}" target="_blank" rel="noopener noreferrer">View location</a>` : ''}
+        ${r.status==='accepted' ? `<div class="assignment-box" id="assignment-${r.id}"></div>` : ''}
       </div>`;
     cont.appendChild(el);
+    if(r.status==='accepted') renderVolunteerAssignment(r);
   });
+}
+
+function renderVolunteerAssignment(request){
+  const container=document.getElementById(`assignment-${request.id}`);
+  if(!container)return;
+  const assignment=request.assignment;
+  container.innerHTML='';
+  const label=document.createElement('span');
+  label.className='assignment-label';
+  label.textContent=assignment ? 'Assigned volunteer' : 'Assign a local volunteer';
+  container.appendChild(label);
+
+  if(assignment){
+    const assigned=document.createElement('div');
+    assigned.className='assignment-note';
+    assigned.textContent=`${assignment.volunteerName}${assignment.volunteerCity ? ` · ${assignment.volunteerCity}` : ''}${assignment.volunteerPhone ? ` · ${assignment.volunteerPhone}` : ''}`;
+    container.appendChild(assigned);
+  }
+
+  const controls=document.createElement('div');
+  controls.className='assignment-controls';
+  const button=document.createElement('button');
+  button.type='button'; button.className='assignment-btn';
+  button.textContent=assignment ? 'Reassign' : 'Choose volunteer';
+  button.addEventListener('click',()=>loadLocalVolunteerChoices(request, container, button));
+  controls.appendChild(button);
+  container.appendChild(controls);
+  if(!assignment){
+    const note=document.createElement('p');
+    note.className='assignment-note';
+    note.textContent='Shows approved volunteers registered in the pickup location.';
+    container.appendChild(note);
+  }
+}
+
+async function loadLocalVolunteerChoices(request, container, trigger){
+  trigger.disabled=true; trigger.textContent='Loading…';
+  try{
+    const payload=await fetchAPI(`/ngo/requests/${encodeURIComponent(request.id)}/volunteers`);
+    const volunteers=Array.isArray(payload.volunteers) ? payload.volunteers : [];
+    if(!volunteers.length){
+      trigger.disabled=false; trigger.textContent='Choose volunteer';
+      const note=container.querySelector('.assignment-note') || document.createElement('p');
+      note.className='assignment-note';
+      note.textContent=`No approved volunteers are listed for ${payload.pickupLocation || 'this pickup location'} yet.`;
+      if(!note.parentNode)container.appendChild(note);
+      return;
+    }
+    const controls=container.querySelector('.assignment-controls');
+    controls.innerHTML='';
+    const select=document.createElement('select'); select.className='assignment-select';
+    select.setAttribute('aria-label','Local volunteer');
+    const placeholder=document.createElement('option'); placeholder.value=''; placeholder.textContent='Select a local volunteer'; select.appendChild(placeholder);
+    volunteers.forEach((volunteer)=>{
+      const option=document.createElement('option'); option.value=volunteer.id;
+      option.textContent=`${volunteer.full_name} · ${volunteer.city}${volunteer.role ? ` · ${volunteer.role}` : ''}`;
+      select.appendChild(option);
+    });
+    const save=document.createElement('button'); save.type='button'; save.className='assignment-btn'; save.textContent='Assign';
+    save.addEventListener('click',()=>saveVolunteerAssignment(request, volunteers, select, save));
+    controls.append(select,save);
+    const note=container.querySelector('.assignment-note') || document.createElement('p');
+    note.className='assignment-note'; note.textContent=`Pickup location: ${payload.pickupLocation}`;
+    if(!note.parentNode)container.appendChild(note);
+  }catch(error){
+    trigger.disabled=false; trigger.textContent='Try again';
+    toast(readApiError(error) || 'Could not load local volunteers.','error');
+  }
+}
+
+async function saveVolunteerAssignment(request, volunteers, select, button){
+  const volunteer=volunteers.find(item=>String(item.id)===String(select.value));
+  if(!volunteer){toast('Select a volunteer first.','error');return;}
+  button.disabled=true; button.textContent='Assigning…';
+  try{
+    const payload=await fetchAPI(`/ngo/requests/${encodeURIComponent(request.id)}/assignments`,{method:'POST',body:JSON.stringify({volunteerId:volunteer.id})});
+    request.assignment={volunteerId:volunteer.id,volunteerName:volunteer.full_name,volunteerCity:volunteer.city,volunteerPhone:volunteer.phone,assignedAt:payload.assignment?.assigned_at};
+    renderReqs();
+    toast(payload.message || 'Volunteer assigned successfully.','success');
+  }catch(error){
+    button.disabled=false; button.textContent='Assign';
+    toast(readApiError(error) || 'Could not assign this volunteer.','error');
+  }
+}
+
+function readApiError(error){
+  try{return JSON.parse(error.message).error || error.message;}catch(_){return error.message;}
 }
 
 function openViewerProfile(userId){
