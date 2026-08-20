@@ -14,6 +14,7 @@ router.get('/stats', authMiddleware, ngoController.getNgoDashboardStats); // NGO
 router.get('/requests', authMiddleware, ngoController.getNgoRequests); // NGO modal request listing
 router.get('/requests/:requestId/volunteers', authMiddleware, ngoController.getLocalVolunteersForRequest);
 router.post('/requests/:requestId/assignments', authMiddleware, ngoController.assignVolunteerToRequest);
+router.put('/assignments/:assignmentId', authMiddleware, ngoController.updateVolunteerAssignment);
 router.get('/:ngoId/statistics', ngoController.getNgoStatistics);
 
 module.exports = router;
