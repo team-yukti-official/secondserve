@@ -1,5 +1,50 @@
 const { supabaseAdmin } = require('../config/supabase');
 
+async function getVolunteerForUser(userId) {
+  const { data: user } = await supabaseAdmin.from('users').select('id, email').eq('id', userId).single();
+  if (!user) return null;
+  const { data: volunteer } = await supabaseAdmin.from('volunteers').select('id, full_name, email, phone, city, role, availability').ilike('email', user.email).eq('status', 'approved').maybeSingle();
+  return volunteer || null;
+}
+
+const getVolunteerTasks = async (req, res) => {
+  try {
+    const volunteer = await getVolunteerForUser(req.user.id);
+    if (!volunteer) return res.status(403).json({ error: 'Your approved volunteer profile is not linked to this login.' });
+    const { data, error } = await supabaseAdmin.from('pickup_volunteer_assignments').select(`*, pickup_requests(id, donation_id, requester_id, status, message, donations(title, description, quantity, donor_id))`).eq('volunteer_id', volunteer.id).order('assigned_at', { ascending: false });
+    if (error) return res.status(400).json({ error: 'Unable to load volunteer tasks.', details: error.message });
+    res.json({ volunteer, tasks: data || [] });
+  } catch (error) { res.status(500).json({ error: 'Get volunteer tasks error', details: error.message }); }
+};
+
+const updateVolunteerTaskStatus = async (req, res) => {
+  try {
+    const volunteer = await getVolunteerForUser(req.user.id);
+    const nextStatus = String(req.body?.status || '').toLowerCase();
+    if (!volunteer || !['accepted', 'received', 'delivered'].includes(nextStatus)) return res.status(400).json({ error: 'Invalid task status.' });
+    const updates = { status: nextStatus, updated_at: new Date().toISOString() };
+    if (nextStatus === 'received') updates.received_at = new Date().toISOString();
+    if (nextStatus === 'delivered') updates.delivered_at = new Date().toISOString();
+    const { data, error } = await supabaseAdmin.from('pickup_volunteer_assignments').update(updates).eq('id', req.params.assignmentId).eq('volunteer_id', volunteer.id).select().single();
+    if (error || !data) return res.status(404).json({ error: 'Task not found.' });
+    if (nextStatus === 'delivered') {
+      await supabaseAdmin.from('pickup_requests').update({ status: 'completed', updated_at: new Date().toISOString() }).eq('id', data.pickup_request_id);
+    }
+    res.json({ message: `Task marked ${nextStatus}.`, assignment: data });
+  } catch (error) { res.status(500).json({ error: 'Update volunteer task error', details: error.message }); }
+};
+
+const submitVolunteerFeedback = async (req, res) => {
+  try {
+    const volunteer = await getVolunteerForUser(req.user.id);
+    const rating = Number(req.body?.rating);
+    if (!volunteer || !Number.isInteger(rating) || rating < 1 || rating > 5) return res.status(400).json({ error: 'Choose a rating from 1 to 5.' });
+    const { data, error } = await supabaseAdmin.from('pickup_volunteer_assignments').update({ volunteer_rating: rating, volunteer_feedback: req.body.feedback || null, volunteer_video_url: req.body.videoUrl || null, updated_at: new Date().toISOString() }).eq('id', req.params.assignmentId).eq('volunteer_id', volunteer.id).eq('status', 'delivered').select().single();
+    if (error || !data) return res.status(404).json({ error: 'Delivered task not found.' });
+    res.json({ message: 'Thank you for sharing your experience.', assignment: data });
+  } catch (error) { res.status(500).json({ error: 'Submit volunteer feedback error', details: error.message }); }
+};
+
 function isApprovedVolunteer(volunteer) {
   const status = String(volunteer?.status || '').toLowerCase();
   return !status || status === 'approved';
@@ -225,6 +270,9 @@ const getVolunteersByRole = async (req, res) => {
 };
 
 module.exports = {
+  getVolunteerTasks,
+  updateVolunteerTaskStatus,
+  submitVolunteerFeedback,
   getAllVolunteers,
   getVolunteerById,
   createVolunteer,
