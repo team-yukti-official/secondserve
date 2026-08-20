@@ -231,6 +231,46 @@ const signup = async (req, res) => {
             return res.status(400).json({ error: 'Profile creation failed', details: profileError.message });
         }
 
+        // A volunteer account also needs a matching operational profile. The
+        // dashboard links these records by email when assigning pickup tasks.
+        if (userType === 'volunteer') {
+            const { data: existingVolunteer, error: existingVolunteerError } = await supabaseAdmin
+                .from('volunteers')
+                .select('id')
+                .ilike('email', email)
+                .maybeSingle();
+
+            if (existingVolunteerError) {
+                return res.status(400).json({
+                    error: 'Volunteer profile lookup failed',
+                    details: existingVolunteerError.message
+                });
+            }
+
+            if (!existingVolunteer) {
+                const { error: volunteerProfileError } = await supabaseAdmin
+                    .from('volunteers')
+                    .insert({
+                        full_name: fullName,
+                        email,
+                        phone: phone || '',
+                        city: normalizedAddress,
+                        role: 'Community Volunteer',
+                        availability: 'Flexible',
+                        status: 'pending',
+                        created_at: new Date(),
+                        updated_at: new Date()
+                    });
+
+                if (volunteerProfileError) {
+                    return res.status(400).json({
+                        error: 'Volunteer profile creation failed',
+                        details: volunteerProfileError.message
+                    });
+                }
+            }
+        }
+
         if (userType === 'ngo') {
             const { data: existingNgoProfile } = await supabaseAdmin
                 .from('ngo_profiles')
