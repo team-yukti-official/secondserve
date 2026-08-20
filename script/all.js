@@ -113,7 +113,7 @@ function getAuthUserType() {
 
     try {
         const user = JSON.parse(userJson);
-        return user?.userType || null;
+        return user?.userType || user?.user_type || null;
     } catch (error) {
         return null;
     }
@@ -288,7 +288,8 @@ function updateAuthUI() {
 
             const routes = {
                 donor: 'donor-dashboard.html',
-                ngo: 'ngo-dashboard.html'
+                ngo: 'ngo-dashboard.html',
+                volunteer: 'volunteer-dashboard.html'
             };
 
             window.location.href = routes[userType] || 'login.html';
