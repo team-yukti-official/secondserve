@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS pickup_volunteer_assignments (
     assignment_message TEXT,
     status VARCHAR(20) NOT NULL DEFAULT 'assigned' CHECK (status IN ('assigned', 'accepted', 'received', 'delivered', 'cancelled')),
     assigned_at TIMESTAMP NOT NULL DEFAULT now(),
-8    updated_at TIMESTAMP NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP NOT NULL DEFAULT now(),
     received_at TIMESTAMP,
     delivered_at TIMESTAMP,
     volunteer_rating INTEGER CHECK (volunteer_rating BETWEEN 1 AND 5),
