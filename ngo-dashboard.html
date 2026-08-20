@@ -936,14 +936,16 @@ const UK   = (typeof API_CONFIG !== 'undefined' ? API_CONFIG.USER_KEY  : null) |
 const ALERT_CHANNEL_KEY = 'secondserve_ngo_alert';
 const ALERT_PREFS_KEY = 'secondserve_ngo_alert_prefs';
 
-const getToken = () => sessionStorage.getItem(TK);
-const getUser  = () => { try{ return JSON.parse(sessionStorage.getItem(UK)); }catch(e){ return null; } };
+const getToken = () => sessionStorage.getItem(TK) || localStorage.getItem(TK);
+const getUser  = () => { try{ return JSON.parse(sessionStorage.getItem(UK) || localStorage.getItem(UK)); }catch(e){ return null; } };
 const clearAuthState = () => {
   sessionStorage.removeItem(TK);
   sessionStorage.removeItem(UK);
   sessionStorage.removeItem('userType');
   sessionStorage.removeItem('userName');
   sessionStorage.removeItem('userEmail');
+  localStorage.removeItem(TK);
+  localStorage.removeItem(UK);
 };
 
 function enforceDashboardAccess(expectedType){
@@ -1520,7 +1522,7 @@ async function loadLocalVolunteerChoices(request, container, trigger){
     note.className='assignment-note'; note.textContent=`Pickup location: ${payload.pickupLocation}`;
     if(!note.parentNode)container.appendChild(note);
     select.value=volunteers[0].id;
-    await saveVolunteerAssignment(request, volunteers, select, save, container);
+    save.focus();
   }catch(error){
     trigger.disabled=false; trigger.textContent='Try again';
     toast(readApiError(error) || 'Could not load local volunteers.','error');
