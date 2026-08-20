@@ -1,10 +1,25 @@
 const { supabaseAdmin } = require('../config/supabase');
 
 async function getVolunteerForUser(userId) {
-  const { data: user } = await supabaseAdmin.from('users').select('id, email').eq('id', userId).single();
-  if (!user) return null;
-  const { data: volunteer } = await supabaseAdmin.from('volunteers').select('id, full_name, email, phone, city, role, availability').ilike('email', user.email).eq('status', 'approved').maybeSingle();
-  return volunteer || null;
+  const { data: user } = await supabaseAdmin.from('users').select('id, email, full_name, phone, address, user_type').eq('id', userId).single();
+  if (!user || String(user.user_type || '').toLowerCase() !== 'volunteer') return null;
+  const { data: volunteer } = await supabaseAdmin.from('volunteers').select('id, full_name, email, phone, city, role, availability, status').ilike('email', user.email).maybeSingle();
+  if (volunteer) return volunteer;
+
+  // Accounts created before volunteer profiles were introduced can still use
+  // the dashboard. Create their pending profile on first dashboard visit.
+  const { data: created, error } = await supabaseAdmin.from('volunteers').insert({
+    full_name: user.full_name || 'Volunteer',
+    email: user.email,
+    phone: user.phone || '',
+    city: user.address || 'Not specified',
+    role: 'Community Volunteer',
+    availability: 'Flexible',
+    status: 'pending',
+    created_at: new Date(),
+    updated_at: new Date()
+  }).select('id, full_name, email, phone, city, role, availability, status').single();
+  return error ? null : created;
 }
 
 const getVolunteerTasks = async (req, res) => {
