@@ -516,8 +516,11 @@ const assignVolunteerToRequest = async (req, res) => {
             .from('donations').select('address, latitude, longitude').eq('id', result.request.donation_id).single();
         const { data: volunteer, error: volunteerError } = await supabaseAdmin
             .from('volunteers').select('id, full_name, city, phone, status, latitude, longitude').eq('id', volunteerId).single();
-        if (donationError || !donation?.address || volunteerError || !volunteer || String(volunteer.status).toLowerCase() !== 'approved') {
+        if (donationError || !donation?.address || volunteerError || !volunteer) {
             return res.status(400).json({ error: 'The selected volunteer is unavailable.' });
+        }
+        if (String(volunteer.status).toLowerCase() !== 'approved') {
+            return res.status(400).json({ error: 'This volunteer is pending admin approval and cannot be assigned yet.' });
         }
         const volunteerDistance = distanceBetween(donation.latitude, donation.longitude, volunteer.latitude, volunteer.longitude);
         if (!isVolunteerLocalToPickup(volunteer.city, donation.address) && volunteerDistance === null) {
