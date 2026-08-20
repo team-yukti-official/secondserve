@@ -446,6 +446,7 @@ body.dark-mode .req-name.clickable:hover{color:#ffffff}
 .assignment-btn{height:30px;padding:4px 8px;border:0;border-radius:7px;background:var(--primary);color:#fff;font:inherit;font-size:.7rem;font-weight:700;cursor:pointer}
 .assignment-btn:disabled{opacity:.65;cursor:wait}
 .assignment-note{font-size:.67rem;color:var(--text-light);margin:4px 0 0;line-height:1.3}
+.assignment-form{display:grid;gap:6px;margin:7px 0}.assignment-form input,.assignment-form textarea{width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 7px;background:var(--card);color:var(--text-dark);font:inherit;font-size:.72rem}.assignment-form textarea{min-height:48px;resize:vertical}.assignment-form label{font-size:.65rem;font-weight:700;color:var(--text-light)}
 body.dark-mode .assignment-select{color:var(--text-dark);background:#fff}
 
 .ab{
@@ -1473,11 +1474,15 @@ function renderVolunteerAssignment(request){
   controls.className='assignment-controls';
   const button=document.createElement('button');
   button.type='button'; button.className='assignment-btn';
-  button.textContent=assignment ? 'Reassign' : 'Choose volunteer';
+  button.textContent=assignment ? 'Assign nearest again' : 'Assign nearest volunteer';
   button.addEventListener('click',()=>loadLocalVolunteerChoices(request, container, button));
   controls.appendChild(button);
   container.appendChild(controls);
   if(!assignment){
+    const form=document.createElement('div');
+    form.className='assignment-form';
+    form.innerHTML='<label>Delivery location</label><input class="delivery-address" type="text" placeholder="Where should the food be delivered?" required><label>Message for volunteer</label><textarea class="assignment-message" placeholder="Add timing, entrance, or handling notes"></textarea>';
+    container.appendChild(form);
     const note=document.createElement('p');
     note.className='assignment-note';
     note.textContent='Shows approved volunteers registered in the pickup location.';
@@ -1491,7 +1496,7 @@ async function loadLocalVolunteerChoices(request, container, trigger){
     const payload=await fetchAPI(`/ngo/requests/${encodeURIComponent(request.id)}/volunteers`);
     const volunteers=Array.isArray(payload.volunteers) ? payload.volunteers : [];
     if(!volunteers.length){
-      trigger.disabled=false; trigger.textContent='Choose volunteer';
+      trigger.disabled=false; trigger.textContent='Assign nearest volunteer';
       const note=container.querySelector('.assignment-note') || document.createElement('p');
       note.className='assignment-note';
       note.textContent=`No approved volunteers are listed for ${payload.pickupLocation || 'this pickup location'} yet.`;
@@ -1505,27 +1510,32 @@ async function loadLocalVolunteerChoices(request, container, trigger){
     const placeholder=document.createElement('option'); placeholder.value=''; placeholder.textContent='Select a local volunteer'; select.appendChild(placeholder);
     volunteers.forEach((volunteer)=>{
       const option=document.createElement('option'); option.value=volunteer.id;
-      option.textContent=`${volunteer.full_name} · ${volunteer.city}${volunteer.role ? ` · ${volunteer.role}` : ''}`;
+      option.textContent=`${volunteer.full_name} · ${volunteer.city}${volunteer.distanceKm !== null && volunteer.distanceKm !== undefined ? ` · ${Number(volunteer.distanceKm).toFixed(1)} km away` : ''}${volunteer.role ? ` · ${volunteer.role}` : ''}`;
       select.appendChild(option);
     });
     const save=document.createElement('button'); save.type='button'; save.className='assignment-btn'; save.textContent='Assign';
-    save.addEventListener('click',()=>saveVolunteerAssignment(request, volunteers, select, save));
+    save.addEventListener('click',()=>saveVolunteerAssignment(request, volunteers, select, save, container));
     controls.append(select,save);
     const note=container.querySelector('.assignment-note') || document.createElement('p');
     note.className='assignment-note'; note.textContent=`Pickup location: ${payload.pickupLocation}`;
     if(!note.parentNode)container.appendChild(note);
+    select.value=volunteers[0].id;
+    await saveVolunteerAssignment(request, volunteers, select, save, container);
   }catch(error){
     trigger.disabled=false; trigger.textContent='Try again';
     toast(readApiError(error) || 'Could not load local volunteers.','error');
   }
 }
 
-async function saveVolunteerAssignment(request, volunteers, select, button){
+async function saveVolunteerAssignment(request, volunteers, select, button, container){
   const volunteer=volunteers.find(item=>String(item.id)===String(select.value));
   if(!volunteer){toast('Select a volunteer first.','error');return;}
+  const deliveryAddress=container.querySelector('.delivery-address')?.value.trim();
+  const message=container.querySelector('.assignment-message')?.value.trim();
+  if(!deliveryAddress){toast('Add a delivery location first.','error');return;}
   button.disabled=true; button.textContent='Assigning…';
   try{
-    const payload=await fetchAPI(`/ngo/requests/${encodeURIComponent(request.id)}/assignments`,{method:'POST',body:JSON.stringify({volunteerId:volunteer.id})});
+    const payload=await fetchAPI(`/ngo/requests/${encodeURIComponent(request.id)}/assignments`,{method:'POST',body:JSON.stringify({volunteerId:volunteer.id,deliveryAddress,message})});
     request.assignment={volunteerId:volunteer.id,volunteerName:volunteer.full_name,volunteerCity:volunteer.city,volunteerPhone:volunteer.phone,assignedAt:payload.assignment?.assigned_at};
     renderReqs();
     toast(payload.message || 'Volunteer assigned successfully.','success');
