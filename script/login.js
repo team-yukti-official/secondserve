@@ -17,7 +17,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const dashboardRoutes = {
         admin: 'admin-dashboard.html',
         donor: 'donor-dashboard.html',
-        ngo: 'ngo-dashboard.html'
+        ngo: 'ngo-dashboard.html',
+        volunteer: 'volunteer-dashboard.html'
     };
 
     function getPostLoginDestination(userType) {
