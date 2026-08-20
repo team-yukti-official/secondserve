@@ -212,7 +212,7 @@ const acceptPickupRequest = async (req, res) => {
         // Get the request
         const { data: request, error: fetchError } = await supabaseAdmin
             .from('pickup_requests')
-            .select('donation_id')
+            .select('donation_id, requester_id')
             .eq('id', requestId)
             .single();
 
@@ -223,7 +223,7 @@ const acceptPickupRequest = async (req, res) => {
         // Check ownership of donation
         const { data: donation } = await supabaseAdmin
             .from('donations')
-            .select('donor_id')
+            .select('donor_id, title')
             .eq('id', request.donation_id)
             .single();
 
