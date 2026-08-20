@@ -1495,7 +1495,7 @@ function renderVolunteerAssignment(request){
 async function loadLocalVolunteerChoices(request, container, trigger){
   trigger.disabled=true; trigger.textContent='Loading…';
   try{
-    const payload=await fetchAPI(`/ngo/requests/${encodeURIComponent(request.id)}/volunteers`);
+    const payload=await fetchAPI(`/ngos/requests/${encodeURIComponent(request.id)}/volunteers`);
     const volunteers=Array.isArray(payload.volunteers) ? payload.volunteers : [];
     if(!volunteers.length){
       trigger.disabled=false; trigger.textContent='Assign nearest volunteer';
@@ -1537,7 +1537,7 @@ async function saveVolunteerAssignment(request, volunteers, select, button, cont
   if(!deliveryAddress){toast('Add a delivery location first.','error');return;}
   button.disabled=true; button.textContent='Assigning…';
   try{
-    const payload=await fetchAPI(`/ngo/requests/${encodeURIComponent(request.id)}/assignments`,{method:'POST',body:JSON.stringify({volunteerId:volunteer.id,deliveryAddress,message})});
+    const payload=await fetchAPI(`/ngos/requests/${encodeURIComponent(request.id)}/assignments`,{method:'POST',body:JSON.stringify({volunteerId:volunteer.id,deliveryAddress,message})});
     request.assignment={volunteerId:volunteer.id,volunteerName:volunteer.full_name,volunteerCity:volunteer.city,volunteerPhone:volunteer.phone,assignedAt:payload.assignment?.assigned_at};
     renderReqs();
     toast(payload.message || 'Volunteer assigned successfully.','success');
