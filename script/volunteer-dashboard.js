@@ -5,7 +5,7 @@
   async function api(path, options={}){
     const headers={'Accept':'application/json','Content-Type':'application/json'}; if(token()) headers.Authorization='Bearer '+token();
     const response=await fetch(BASE+path,{...options,headers});
-    if(response.status===401||response.status===403){location.href='login.html';throw new Error('Please log in with your volunteer account.');}
+    if(response.status===401){location.href='login.html';throw new Error('Your session has expired. Please log in again.');}
     if(!response.ok){const text=await response.text();let message=text;try{message=JSON.parse(text).error||text;}catch(_){ }throw new Error(message||response.statusText);}
     return response.json();
   }
@@ -32,7 +32,7 @@
   }
   async function load(){
     const sync=document.getElementById('syncText');sync.textContent='Refreshing tasks...';
-    try{const payload=await api('/volunteers/dashboard/tasks');document.getElementById('volunteerName').textContent=payload.volunteer.full_name||'Volunteer';document.getElementById('volunteerMeta').textContent=[payload.volunteer.city,payload.volunteer.role].filter(Boolean).join(' · ')||'Approved delivery partner';render(payload.tasks||[]);sync.textContent='Updated just now';}
+    try{const payload=await api('/volunteers/dashboard/tasks');document.getElementById('volunteerName').textContent=payload.volunteer.full_name||'Volunteer';const approval=String(payload.volunteer.status||'approved').toLowerCase()==='approved'?'Approved delivery partner':'Profile pending admin approval';document.getElementById('volunteerMeta').textContent=[payload.volunteer.city,payload.volunteer.role].filter(Boolean).join(' · ')||approval;render(payload.tasks||[]);sync.textContent=approval==='Approved delivery partner'?'Updated just now':'Your profile is pending approval. Assignments will appear once approved.';}
     catch(error){document.getElementById('taskList').innerHTML='<div class="error"><i class="fas fa-triangle-exclamation"></i> '+esc(error.message)+'</div>';sync.textContent='Could not connect';}
   }
   document.getElementById('refreshBtn').addEventListener('click',load);
