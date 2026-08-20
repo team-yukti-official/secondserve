@@ -36,6 +36,12 @@
     catch(error){document.getElementById('taskList').innerHTML='<div class="error"><i class="fas fa-triangle-exclamation"></i> '+esc(error.message)+'</div>';sync.textContent='Could not connect';}
   }
   document.getElementById('refreshBtn').addEventListener('click',load);
+  const settingsBtn=document.getElementById('settingsBtn');
+  const settingsPanel=document.getElementById('settingsPanel');
+  const routeNotifications=document.getElementById('routeNotifications');
+  if(settingsBtn&&settingsPanel){settingsBtn.addEventListener('click',()=>settingsPanel.classList.toggle('show'));}
+  if(routeNotifications){routeNotifications.checked=localStorage.getItem('volunteerRouteNotifications')==='1';routeNotifications.addEventListener('change',()=>localStorage.setItem('volunteerRouteNotifications',routeNotifications.checked?'1':'0'));}
+  document.getElementById('logoutBtn')?.addEventListener('click',async()=>{if(!confirm('Are you sure you want to log out?'))return;try{await fetch(BASE+'/auth/logout',{method:'POST',headers:token()?{Authorization:'Bearer '+token()}: {}});}catch(_){ }if(typeof APIUtils!=='undefined')APIUtils.logout();['userType','userName','userEmail'].forEach(key=>{sessionStorage.removeItem(key);localStorage.removeItem(key);});location.href='login.html';});
   document.getElementById('taskList').addEventListener('click',async event=>{const button=event.target.closest('[data-status]');if(!button)return;const task=button.closest('.task');const assignmentId=task.dataset.assignment;if(!assignmentId)return;button.disabled=true;try{await api('/volunteers/dashboard/tasks/'+encodeURIComponent(assignmentId)+'/status',{method:'PUT',body:JSON.stringify({status:button.dataset.status})});await load();}catch(error){alert(error.message);button.disabled=false;}});
   document.getElementById('taskList').addEventListener('submit',async event=>{const form=event.target.closest('[data-feedback]');if(!form)return;event.preventDefault();const rating=form.querySelector('[name="rating"]:checked')?.value;if(!rating){alert('Choose a rating first.');return;}const button=form.querySelector('button');button.disabled=true;try{await api('/volunteers/dashboard/tasks/'+encodeURIComponent(form.dataset.feedback)+'/feedback',{method:'POST',body:JSON.stringify({rating,feedback:form.feedback.value,videoUrl:form.videoUrl.value})});await load();}catch(error){alert(error.message);button.disabled=false;}});
   load();
