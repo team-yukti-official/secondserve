@@ -1,6 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const volunteerController = require('../controllers/volunteerController');
+const authMiddleware = require('../middleware/auth');
+
+router.get('/dashboard/tasks', authMiddleware, volunteerController.getVolunteerTasks);
+router.put('/dashboard/tasks/:assignmentId/status', authMiddleware, volunteerController.updateVolunteerTaskStatus);
+router.post('/dashboard/tasks/:assignmentId/feedback', authMiddleware, volunteerController.submitVolunteerFeedback);
 
 // Get volunteers by city
 router.get('/city/:city', volunteerController.getVolunteersByCity);
