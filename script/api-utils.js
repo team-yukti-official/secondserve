@@ -21,7 +21,8 @@ const APIUtils = {
      * Get authorization token from storage
      */
     getToken() {
-        return sessionStorage.getItem(API_CONFIG.TOKEN_KEY);
+        return sessionStorage.getItem(API_CONFIG.TOKEN_KEY)
+            || localStorage.getItem(API_CONFIG.TOKEN_KEY);
     },
 
     /**
@@ -30,6 +31,7 @@ const APIUtils = {
     setToken(token) {
         if (token) {
             sessionStorage.setItem(API_CONFIG.TOKEN_KEY, token);
+            localStorage.setItem(API_CONFIG.TOKEN_KEY, token);
         }
     },
 
@@ -38,6 +40,7 @@ const APIUtils = {
      */
     clearToken() {
         sessionStorage.removeItem(API_CONFIG.TOKEN_KEY);
+        localStorage.removeItem(API_CONFIG.TOKEN_KEY);
     },
 
     /**
@@ -46,6 +49,7 @@ const APIUtils = {
     setUserData(user) {
         if (user) {
             sessionStorage.setItem(API_CONFIG.USER_KEY, JSON.stringify(user));
+            localStorage.setItem(API_CONFIG.USER_KEY, JSON.stringify(user));
         }
     },
 
@@ -53,8 +57,13 @@ const APIUtils = {
      * Get user data from storage
      */
     getUserData() {
-        const data = sessionStorage.getItem(API_CONFIG.USER_KEY);
-        return data ? JSON.parse(data) : null;
+        const data = sessionStorage.getItem(API_CONFIG.USER_KEY)
+            || localStorage.getItem(API_CONFIG.USER_KEY);
+        try {
+            return data ? JSON.parse(data) : null;
+        } catch (error) {
+            return null;
+        }
     },
 
     /**
