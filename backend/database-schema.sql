@@ -5,7 +5,7 @@ CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT auth.uid(),
     email VARCHAR(255) UNIQUE NOT NULL,
     full_name VARCHAR(255),
-    user_type VARCHAR(50) NOT NULL CHECK (user_type IN ('donor', 'ngo', 'admin')),
+    user_type VARCHAR(50) NOT NULL CHECK (user_type IN ('donor', 'ngo', 'volunteer', 'admin')),
     phone VARCHAR(20),
     address TEXT,
     bio TEXT,
