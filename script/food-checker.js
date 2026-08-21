@@ -40,6 +40,8 @@
 
     let selectedFile = null;
     let selectedDataUrl = null;
+    let analysisInProgress = false;
+    let rateLimitUntil = 0;
 
     if (donateBtn) {
         donateBtn.addEventListener('click', () => {
@@ -137,7 +139,16 @@
 
     // ---- Analyze ---------------------------------------------------------------
     analyzeBtn.addEventListener('click', async () => {
-        if (!selectedDataUrl) return;
+        if (!selectedDataUrl || analysisInProgress) return;
+
+        if (Date.now() < rateLimitUntil) {
+            const secondsRemaining = Math.ceil((rateLimitUntil - Date.now()) / 1000);
+            showError(`The AI service is rate-limited. Please try again in ${secondsRemaining} seconds.`);
+            return;
+        }
+
+        analysisInProgress = true;
+        analyzeBtn.disabled = true;
         hideError();
 
         uploaderCard.hidden = true;
@@ -159,12 +170,16 @@
                 renderResults(assessment);
                 loadingCard.hidden = true;
                 resultsSection.hidden = false;
+                analysisInProgress = false;
                 return;
             }
 
             loadingCard.hidden = true;
             uploaderCard.hidden = false;
             showError(err.message || 'Something went wrong while checking this photo. Please try again.');
+        } finally {
+            analysisInProgress = false;
+            analyzeBtn.disabled = !selectedDataUrl;
         }
     });
 
@@ -198,6 +213,10 @@ Return exactly this JSON shape:
 If the image does not show food at all, set food_identified to "Unclear — not a food image", verdict to "caution", quality_score to 0, confidence to 0, and explain why in summary.`;
 
     async function callFoodCheckApi(dataUrl) {
+        if (typeof API_CONFIG !== 'undefined' && API_CONFIG.USE_LOCAL_FOOD_CHECK) {
+            return simulateFoodCheck();
+        }
+
         const hasApiUrl = typeof API_CONFIG !== 'undefined'
             && API_CONFIG.BASE_URL
             && !API_CONFIG.BASE_URL.includes('example.com');
@@ -246,6 +265,13 @@ If the image does not show food at all, set food_identified to "Unclear — not 
             data = responseText ? JSON.parse(responseText) : null;
         } catch (parseError) {
             data = null;
+        }
+
+        if (response.status === 429) {
+            const retryAfterSeconds = Number(response.headers.get('Retry-After'));
+            const waitSeconds = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0 ? Math.ceil(retryAfterSeconds) : 60;
+            rateLimitUntil = Date.now() + (waitSeconds * 1000);
+            throw new Error(`The AI service is rate-limited. Please wait ${waitSeconds} seconds before trying again.`);
         }
 
         if (!response.ok) {
@@ -350,24 +376,21 @@ If the image does not show food at all, set food_identified to "Unclear — not 
                 const varianceBrightness = brightnessValues.reduce((acc, value) => acc + Math.pow(value - meanBrightness, 2), 0) / pixelCount;
                 const brightnessContrast = Math.sqrt(varianceBrightness);
 
-                const greenScore = Math.max(0, avgGreen - avgRed) * 1.6;
-                const brownScore = Math.max(0, Math.min(avgRed, avgGreen) - avgBlue);
-                const dullScore = grayness * 0.9;
+                // Local mode can assess image visibility only; food colour alone is not evidence of spoilage.
+                // This avoids treating normal cooked or brown foods as harmful.
                 const darkScore = Math.max(0, 0.35 - brightness) * 2.5;
                 const lowContrastScore = Math.max(0, 0.16 - contrast) * 3;
 
-                const qualityScore = 25
-                    + Math.min(30, brightness * 35)
-                    + Math.min(25, saturation * 30)
-                    + Math.min(20, contrast * 25)
-                    + Math.min(20, greenScore * 20)
-                    - Math.min(25, dullScore * 15)
-                    - Math.min(25, darkScore * 10)
-                    - Math.min(20, lowContrastScore * 10)
-                    - Math.min(25, brownScore * 12);
+                const qualityScore = 45
+                    + Math.min(24, brightness * 32)
+                    + Math.min(16, saturation * 22)
+                    + Math.min(15, contrast * 30)
+                    - Math.min(25, darkScore * 12)
+                    - Math.min(15, lowContrastScore * 10);
 
                 const clampedScore = Math.max(0, Math.min(100, Math.round(qualityScore)));
-                const verdict = clampedScore >= 80 ? 'good' : clampedScore >= 58 ? 'caution' : 'bad';
+                const imageIsTooUnclear = brightness < 0.14 && contrast < 0.08;
+                const verdict = imageIsTooUnclear ? 'bad' : clampedScore >= 58 ? 'good' : 'caution';
                 const notes = {
                     good: {
                         visual_freshness: 'Looks fresh and vibrant.',
@@ -382,10 +405,10 @@ If the image does not show food at all, set food_identified to "Unclear — not 
                         packaging_hygiene: 'Packaging looks mostly okay.'
                     },
                     bad: {
-                        visual_freshness: 'The food looks dull, dark, or discolored.',
-                        color_texture: 'Color appears unhealthy or spoiled.',
-                        spoilage_signs: 'Visible spoilage or unwanted color is present.',
-                        packaging_hygiene: 'Presentation does not look fresh or safe.'
+                        visual_freshness: 'The photo is too dark or unclear to assess freshness.',
+                        color_texture: 'Retake the photo in brighter, even lighting.',
+                        spoilage_signs: 'No reliable spoilage assessment can be made from this image.',
+                        packaging_hygiene: 'Make sure the packaging is clearly visible in the new photo.'
                     }
                 };
 
@@ -401,17 +424,17 @@ If the image does not show food at all, set food_identified to "Unclear — not 
                         spoilage_signs: { pass: verdict === 'good', note: notes[verdict].spoilage_signs },
                         packaging_hygiene: { pass: verdict === 'good', note: notes[verdict].packaging_hygiene }
                     },
-                    issues: verdict === 'good' ? [] : [verdict === 'caution' ? 'Donate soon' : 'Not safe to donate'],
+                    issues: verdict === 'good' ? [] : [verdict === 'caution' ? 'Check the food in person before donating' : 'Photo is too dark or unclear for a reliable assessment'],
                     summary: verdict === 'good'
                         ? 'The food looks good enough for donation.'
                         : verdict === 'caution'
                             ? 'The food is borderline; handle quickly if donating.'
-                            : 'This food looks unsafe to donate.',
+                            : 'This photo is too dark or unclear to assess safely.',
                     recommendation: verdict === 'good'
                         ? 'Donate or use soon.'
                         : verdict === 'caution'
                             ? 'Use soon or donate carefully.'
-                            : 'Avoid donating this item.',
+                            : 'Retake the photo in bright, even lighting before deciding.',
                     confidence
                 });
             };
