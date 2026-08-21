@@ -53,7 +53,8 @@
         const pickup = [22.427415,87.861576];
         const destination = [22.414111,87.858831];
         let route = [pickup, destination];
-        const duration = 15 * 60 * 1000; // Fifteen-minute live delivery window.
+        const duration = 20 * 60 * 1000; // Twenty-minute live delivery window.
+        const animationDelay = 5 * 60 * 1000; // Keep the volunteer marker at pickup for the first five minutes.
         let totalKm = 1.55;
         const map = L.map('deliveryMap', { zoomControl:false, attributionControl:true }).setView([22.4299,87.8601], 15);
         L.control.zoom({ position:'bottomright' }).addTo(map);
@@ -109,7 +110,7 @@
             startedAt = getDeliveryStartTime();
             frame = requestAnimationFrame(update);
         }
-        function update() { const now=Date.now(), elapsed=Math.min(now-startedAt,duration), progress=elapsed/duration, point=interpolate(progress); volunteer.setLatLng(point); completedLine.setLatLngs(route.slice(0,Math.floor(progress*(route.length-1))+1).concat([point])); $('progressBar').style.width=(progress*100)+'%'; $('progressText').textContent=Math.round(progress*100)+'% complete'; $('distanceText').textContent=(totalKm*progress).toFixed(2)+' km travelled'; $('elapsedTime').textContent=format(elapsed); $('etaTime').textContent=format(duration-elapsed); if(now-lastFollowAt>1100){ map.panTo(point,{animate:true,duration:.8,noMoveStart:true}); lastFollowAt=now; } if(now-lastLocationUpdate>4500){ $('updateTime').textContent='just now'; lastLocationUpdate=now; } $('mapClock').textContent=progress < 1 ? 'GPS location updating' : 'Delivery completed'; if(progress >= 1) { try { localStorage.removeItem(DELIVERY_STORAGE_KEY); } catch (error) { /* Storage is unavailable. */ } $('stateLabel').textContent='DELIVERED SUCCESSFULLY'; $('stateText').textContent='Food safely delivered to Mecheda Station'; $('mapStatus').textContent='Delivery complete'; volunteer.bindPopup('<b>Paban Rana</b><br>Delivery complete').openPopup(); deliveryModal.classList.add('show'); return; } frame=requestAnimationFrame(update); }
+        function update() { const now=Date.now(), elapsed=Math.min(now-startedAt,duration), progress=Math.max(0, elapsed-animationDelay)/(duration-animationDelay), point=interpolate(progress); volunteer.setLatLng(point); completedLine.setLatLngs(route.slice(0,Math.floor(progress*(route.length-1))+1).concat([point])); $('progressBar').style.width=(progress*100)+'%'; $('progressText').textContent=Math.round(progress*100)+'% complete'; $('distanceText').textContent=(totalKm*progress).toFixed(2)+' km travelled'; $('elapsedTime').textContent=format(elapsed); $('etaTime').textContent=format(duration-elapsed); if(now-lastFollowAt>1100){ map.panTo(point,{animate:true,duration:.8,noMoveStart:true}); lastFollowAt=now; } if(now-lastLocationUpdate>4500){ $('updateTime').textContent='just now'; lastLocationUpdate=now; } $('mapClock').textContent=progress < 1 ? 'GPS location updating' : 'Delivery completed'; if(progress >= 1) { try { localStorage.removeItem(DELIVERY_STORAGE_KEY); } catch (error) { /* Storage is unavailable. */ } $('stateLabel').textContent='DELIVERED SUCCESSFULLY'; $('stateText').textContent='Food safely delivered to Mecheda Station'; $('mapStatus').textContent='Delivery complete'; volunteer.bindPopup('<b>Paban Rana</b><br>Delivery complete').openPopup(); deliveryModal.classList.add('show'); return; } frame=requestAnimationFrame(update); }
         $('closeDeliveryModal').addEventListener('click', function(){ deliveryModal.classList.remove('show'); });
         loadRoadRoute();
     });
