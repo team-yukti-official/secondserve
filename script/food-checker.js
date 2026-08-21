@@ -214,7 +214,7 @@ If the image does not show food at all, set food_identified to "Unclear — not 
         }
 
         const payload = {
-            model: API_CONFIG.AI_MODEL_NAME || 'nvidia/nemotron-nano-12b-v2-vl:free',
+            model: API_CONFIG.AI_MODEL_NAME || 'google/gemma-4-31b-it',
             temperature: 0.2,
             max_tokens: 500,
             messages: [
